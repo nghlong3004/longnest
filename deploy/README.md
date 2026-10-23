@@ -1,9 +1,10 @@
 # Disposable PostgreSQL development definition
 
 `compose.dev.yaml` contains **only PostgreSQL**, not the application or a deployment
-stack. It lives in the root layout's infrastructure area, outside Java source.
-Creating/validating this file does not authorize running it, connecting the server
-or applying migrations. No container, image pull or database execution was performed.
+stack. The host [dev launcher](../scripts/README.md) now manages this service and
+readiness before ledger preparation/backend startup. No container, image pull or
+database execution was performed in implementation verification; those require
+operator runtime authority. Docker Engine must already be running locally.
 
 ## Selected image and storage
 
@@ -36,79 +37,90 @@ finance store. Ordinary `down` can leave unused anonymous volumes behind;
 [down --volumes](https://docs.docker.com/reference/cli/docker/compose/down/) removes
 attached anonymous volumes too. Use the scoped cleanup below, not global pruning.
 
-## Commands for a separately authorized operator
+## Single-command development startup
 
 Run from `/home/nghlong3004/projects/longnest` with Docker Engine/Compose available
-and permission to use the selected local Docker context. These are instructions,
-not operations performed or newly authorized by this file. The explicit env-file
-prevents Compose from auto-reading private `.env` files. No `.env.dev` is loaded.
+and permission to use the selected local Docker context. Configure root `.env.dev`
+using the tracked safe `.env.example` and run:
 
 ```sh
-# Static validation only: no service or database starts.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml config --quiet
-
-# Start PostgreSQL only (may pull the image); does not wait for database readiness.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml up -d postgres
-
-# Stop without removing the container/data.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml stop postgres
-
-# Resume that stopped container, preserving its data.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml start postgres
-
-# Restart the same container, preserving its data.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml restart postgres
-
-# DESTRUCTIVE: remove this dev container/data and its unused anonymous volume.
-docker compose --env-file /dev/null -p longnest-dev -f deploy/compose.dev.yaml down --volumes
+bash scripts/dev-server.sh
 ```
 
+The launcher builds/tests, ensures the sole dev service exists/runs without
+recreation, waits up to 60 seconds for readiness (plus up to 2 seconds kill grace),
+then migrates/validates/prepares
+the owner before launching the backend. It uses absolute paths:
+
+```text
+docker compose --env-file <root>/.env.dev -p longnest-dev -f <root>/deploy/compose.dev.yaml ...
+```
+
+Readiness is `exec -T postgres pg_isready -U <effective-user> -d <derived-name>`.
+Only absent or matching stopped containers receive `up -d --no-recreate postgres`;
+an unready running container is polled, never reset or recreated. Existing image,
+port, storage and bootstrap credential/name mismatch fails before preflight.
+Local Docker access/configuration errors are not treated as an absent container.
+Full Compose config and private inspection values are never printed by the launcher.
+
+## Stop/resume and deliberate disposal
+
+After Ctrl-C stops the host backend, an authorized operator may use the following
+scoped commands with the same local Docker context. These instructions were not
+executed here. Inspect the exact dev container ID without printing its environment:
+
+```sh
+
+docker ps -a --filter label=com.docker.compose.project=longnest-dev \
+  --filter label=com.docker.compose.service=postgres --format '{{.ID}} {{.Status}}'
+
+# Substitute the single inspected dev ID; preserves its data.
+docker stop REPLACE_WITH_INSPECTED_DEV_CONTAINER_ID
+
+# DESTRUCTIVE, only when deliberately discarding all disposable dev data:
+# after stopping it, substitute that same inspected ID; also removes unused volumes.
+docker rm -v REPLACE_WITH_INSPECTED_DEV_CONTAINER_ID
+```
+
+Alternatively re-run the dev launcher to resume a matching stopped DB and backend.
 Do not use this project name for unrelated containers. Do not run cleanup against
 anything containing wanted data. The definition has no automatic restart policy,
-application service, migrations, owner-head seed, init script or mount.
+application service, schema SQL/init script or mount. Migrations and safe owner
+preparation happen in the separate host Java preflight, not inside PostgreSQL.
 
 ## What environment files actually configure
 
-The commands above deliberately use `--env-file /dev/null`: neither root `.env`
-nor `.env.dev` is loaded. Compose `--env-file` supplies **model interpolation**,
-not blanket container injection. This YAML has no `${...}` references and has fixed
-`environment` values, so replacing it with `--env-file .env.dev` alone does not
-change the PostgreSQL settings. For example, from root:
-
-```sh
-# Optional interpolation input only; not needed by this fixed-value definition.
-docker compose --env-file .env.dev -p longnest-dev -f deploy/compose.dev.yaml config --quiet
-```
-
-No app variable from the example launcher configuration is consumed by this model.
-Compose's own control variables (such as COMPOSE_*), if supplied, can affect Compose
-itself; do not treat an arbitrary application env file as a Compose configuration.
-The fixed commands with explicit project/file and `/dev/null` remain recommended.
-There is no service `env_file`; only the declared `POSTGRES_*` and `PGDATA` constants
-are passed by this definition into the DB container. Wiring env-based credentials
-would require an explicit future Compose change; none was made or is needed here.
+The launcher explicitly passes root `.env.dev` as Compose interpolation input, not
+as a blanket service `env_file`. It exports the same effective settings (inherited
+environment wins even if empty) to prevent a separate Compose precedence contract.
+YAML maps `SPRING_DATASOURCE_USERNAME/PASSWORD` to `POSTGRES_USER/PASSWORD` and
+internal `LONGNEST_DEV_DB_NAME` to `POSTGRES_DB`. The launcher derives that name
+only from `jdbc:postgresql://127.0.0.1:54329/NAME`; NAME/username must be ASCII
+identifiers up to63 characters. Remote/alternate-port/query-bearing URLs and an
+explicit conflicting derived name fail; do not set that internal name separately.
+Only these declared PostgreSQL values, PGDATA and init arguments enter the container.
+Telegram/DeepSeek values are not injected. Root `.env` is never loaded. Bare
+`POSTGRES_*` variables are not alternate application configuration.
 
 The Java backend is a **separate host process**, not a Compose service. The
 [backend launcher](../scripts/README.md) explicitly reads root `.env.dev` for Java;
-it neither starts Compose nor changes the PostgreSQL container's environment.
+it prepares Compose before Java but never reconfigures an existing mismatched container.
 Direct Java startup still has no dotenv loader. No automatic `.env` merge exists.
 
 ## Connection placeholders and remaining inputs
 
 The only published port is `127.0.0.1:54329` → container 5432. Port availability,
 image pull, startup, readiness and same-container restart behavior remain untested.
-Database/user/password are the public **synthetic dev-only** placeholders
+The tracked example's database/user/password are public **synthetic dev-only** placeholders
 `longnest_dev` / `longnest_dev` / `longnest_dev_only`. The image-created user is a
 bootstrap superuser; it is not a production/application-role security design.
 Do not use these credentials, this storage or this file for real financial data.
 
-After separately authorized startup/readiness, a host-side client would target
-`jdbc:postgresql://127.0.0.1:54329/longnest_dev`. Compose does not inject database
-settings into the Java process. An authorized server test still needs explicit
-DataSource URL/user/password, the `ledger` profile and a synthetic
-`longnest.ledger.owner`. Starting that profile can execute Flyway and contact the
-database: it is **not** part of static validation. Also needed: authorized fixture
-head initialization and bounded migration/save/replay/reopen test scope. No backup,
+They are defaults in the example only; container and app use the effective file/
+inherited datasource values. The launcher supplies both Java processes with these
+values and the stable configured owner. Preflight's `ledger-init` profile can
+execute Flyway and prepare only genuinely fresh storage; the subsequent `ledger`
+process never auto-seeds. None is part of static validation. No backup,
 restore guarantee or durable-ledger acceptance follows from this disposable file.
 
 ## Telegram token readiness
@@ -120,7 +132,7 @@ candidate disposition is in [CURRENT STATUS](../docs/WORK_STATUS.md); no live bo
 is established. The [backend launcher](../scripts/README.md#optional-telegram-configuration)
 loads root `.env.dev` into the separate Java process with inherited-env precedence.
 Direct Spring/Java startup does not import dotenv files; `.env` is not loaded.
-This fixed-value Compose model neither consumes nor injects Telegram settings.
+This Compose model does not inject Telegram settings into PostgreSQL.
 Do not paste tokens into chat or put them in this Compose file. Database and
 Telegram activation still require their own runtime scope; configuration/code
 availability is not permission or evidence of live execution.

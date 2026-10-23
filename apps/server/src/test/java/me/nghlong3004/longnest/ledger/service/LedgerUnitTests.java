@@ -78,6 +78,17 @@ class LedgerUnitTests {
     when(store.controlEventFingerprint(any(), any())).thenReturn(Optional.empty());
   }
 
+  @Test
+  void devPreparationRequiresAuthorizedStartupContext() {
+    transactions.prepareOwner(new HostContext("personal", null, null, null));
+    verify(store).prepareOwner("personal");
+    fails(() -> transactions.prepareOwner(new HostContext("foreign", null, null, null)),
+        LedgerException.Code.NOT_FOUND_OR_FORBIDDEN);
+    fails(() -> transactions.prepareOwner(HOST), LedgerException.Code.INVALID_FIELD);
+    verify(store, never()).prepareOwner("foreign");
+    verify(store, never()).initializeOwner(any());
+  }
+
   static TransactionInput input(String amount) {
     return new TransactionInput(TransactionType.EXPENSE, amount, "VND", Optional.empty(),
         Optional.of(Category.FOOD), Optional.of("ăn trưa"));

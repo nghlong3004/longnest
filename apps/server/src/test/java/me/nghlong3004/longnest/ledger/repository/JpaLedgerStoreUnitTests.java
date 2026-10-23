@@ -7,6 +7,7 @@ import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
@@ -68,6 +69,54 @@ class JpaLedgerStoreUnitTests {
         .thenReturn(durability);
     when(durability.getSingleResult()).thenReturn("on:on");
     return lock;
+  }
+
+  @Test
+  void devPreparationCreatesOnlyFreshStorageThenAcceptsItsSoleOwnerWithoutReset() {
+    var lock = durableInitQueries();
+    when(heads.count()).thenReturn(0L);
+    store.prepareOwner("personal");
+    var saved = ArgumentCaptor.forClass(OwnerHead.class);
+    verify(heads).saveAndFlush(saved.capture());
+    assertThat(saved.getValue().getGeneration()).isZero();
+    when(heads.count()).thenReturn(1L);
+    when(heads.existsById("personal")).thenReturn(true);
+    when(entries.count()).thenReturn(12L);
+    store.prepareOwner("personal");
+    verify(lock, times(2)).executeUpdate();
+    verify(heads, times(1)).saveAndFlush(any());
+  }
+
+  @ParameterizedTest
+  @ValueSource(ints = {1, 2, 3, 4, 5, 6})
+  void devPreparationRejectsForeignMultipleOrMissingHeadsWithNonemptyStorage(int occupied) {
+    durableInitQueries();
+    if (occupied == 1) when(heads.count()).thenReturn(1L); // wrong owner
+    if (occupied == 2) when(heads.count()).thenReturn(2L);
+    if (occupied == 3) when(entries.count()).thenReturn(1L);
+    if (occupied == 4) when(inboxes.count()).thenReturn(1L);
+    if (occupied == 5) when(controls.count()).thenReturn(1L);
+    if (occupied == 6) when(controlEvents.count()).thenReturn(1L);
+    assertThatThrownBy(() -> store.prepareOwner("personal")).isInstanceOf(LedgerException.class);
+    verify(heads, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void devPreparationDoesNotConvertQueryFailureIntoFreshStorage() {
+    durableInitQueries();
+    when(heads.count()).thenThrow(new IllegalStateException("unavailable"));
+    assertThatThrownBy(() -> store.prepareOwner("personal")).hasMessage("unavailable");
+    verify(heads, never()).saveAndFlush(any());
+  }
+
+  @Test
+  void devPreparationRequiresDurabilityEvenForAnExistingOwner() {
+    durableInitQueries();
+    when(entityManager.createNativeQuery(
+        "select current_setting('fsync') || ':' || current_setting('synchronous_commit')")
+        .getSingleResult()).thenReturn("on:off");
+    assertThatThrownBy(() -> store.prepareOwner("personal")).isInstanceOf(LedgerException.class);
+    verifyNoInteractions(heads);
   }
 
   @Test

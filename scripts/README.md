@@ -1,15 +1,19 @@
 # Backend development launcher
 
-`dev-server.sh` is a host-side backend launcher, not a container, database setup
-or safe smoke command. It requires Bash 4.4+, GNU `env`, a Java 25 JDK and Maven
-on the inherited `PATH`. It automatically packages/tests the backend, then runs its
-executable JAR; no prebuilt artifact is required. It starts no other service.
+`dev-server.sh` is a host-side development launcher, not a safe smoke command or
+production provisioning tool. It requires Bash 4.4+, GNU `env`/`timeout`, util-linux
+`flock`, Java 25, Maven and Docker Engine with Compose on inherited `PATH`.
+Docker's local Unix-socket daemon must already be available; the script never
+installs tools, starts the daemon or changes host permissions. One command builds/
+tests, ensures the dev PostgreSQL service is running/ready, migrates/prepares the
+configured ledger owner, then runs the backend. No operator JAR handling is needed.
 The small root `scripts/` directory separates host tooling from Java and Compose.
 
 ## Usage
 
 With private `.env.dev` configured as below, and **only with separately authorized
-database connection/migration scope**:
+database/container connection/migration scope** (and Telegram/provider authority
+if those integrations are enabled):
 
 ```sh
 # From the repository root:
@@ -20,9 +24,12 @@ bash /home/nghlong3004/projects/longnest/scripts/dev-server.sh
 ```
 
 The launcher resolves root relative to itself and validates **only root `.env.dev`**.
-It runs `mvn -B -ntp package` from `apps/server`, with tests enabled, then changes
-working directory to root and execs Java with the packaged absolute JAR path and
-`--spring.profiles.active=ledger`. No arguments are accepted or forwarded.
+It runs `mvn -B -ntp package` from `apps/server`, with tests enabled. On success it
+prepares PostgreSQL, then runs the packaged JAR once with `ledger-init` and internal
+`--longnest.ledger.initialize-if-absent=true`. That process migrates/validates and
+commits owner preparation, excludes both integrations, and exits. Only a zero exit
+allows the launcher to exec the same JAR under `ledger`. No arguments, extra mode,
+manual exports, profile edits or separate init command are required.
 This follows the repository's documented installed-Maven convention (3.10.0 in
 the verified environment), avoiding wrapper distribution download/bootstrap and
 a long-lived Maven parent for the application. No `clean`, test-skipping,
@@ -40,9 +47,10 @@ artifact at the expected path. There is no prebuilt-JAR shortcut/failure fallbac
 The artifact path is currently `apps/server/target/longnest-0.0.1-SNAPSHOT.jar`;
 update it if the Maven artifact/version changes. Java's exit status and signals
 are preserved without a remaining parent-shell wrapper; Ctrl-C stops that process.
-During packaging, INT/TERM is forwarded to Maven's separate process group
-(including test JVMs); the launcher waits for the build to stop and exits 130/143
-without launching the backend. Run in the foreground; backgrounding from a shell
+During packaging, DB startup and preparation, INT/TERM is forwarded to the current
+process group; interruption stops before normal backend startup (exit130/143).
+If PostgreSQL was already started, interruption/failure does not remove or stop it.
+Run in the foreground; backgrounding from a shell
 that ignores SIGINT has that shell's normal inherited-signal limitations.
 
 A readable `.env.dev` is required even when values are supplied via exported
@@ -69,15 +77,50 @@ application validation still checks the actual owner/values. If present, the
 effective `SPRING_PROFILES_ACTIVE` must be exactly `ledger`, not `smoke`, `dev`
 or a list. The launcher explicitly selects that existing profile on the Java
 command line; it does not add a new dev profile or alter YAML/JPA/Flyway settings.
-Configuration checks do not establish reachability, credentials, a correct schema
-or a successful live application start.
+Required URL shape is exactly `jdbc:postgresql://127.0.0.1:54329/NAME`, with NAME
+and username matching `[A-Za-z_][A-Za-z0-9_]{0,62}`. Remote URLs, other ports, query
+options and conflicting `LONGNEST_DEV_DB_NAME` fail before build/Docker. Database
+name is derived from that URL, not a second operator setting. Compose interpolates
+the same effective datasource username/password; bare `POSTGRES_*` env values do
+not configure the app. Keep a stable owner across launches. Root `.env.example`
+uses synthetic defaults, not mandatory names/passwords. Do not use real finance
+data with this disposable storage.
 
-Normal startup **can contact the configured database and execute Flyway** from
-`db/ledger`, followed by Hibernate schema validation. SQL initialization remains
-disabled. There is no owner-head seed: authorized fixture head
-initialization and save/replay/reopen verification are still required. The launcher
-does not grant execution permission or prove a usable ledger. Use the separate
-test-only no-database smoke for safe bootstrap checks, not this command.
+Compose calls use absolute paths equivalent to:
+
+```text
+docker compose --env-file <root>/.env.dev -p longnest-dev -f <root>/deploy/compose.dev.yaml ...
+```
+
+The launcher supplies effective file/inherited values through the command environment,
+without password/token arguments or full Compose-config output. It checks a local
+Docker context, inspects service/container state and compares image, published port,
+PGDATA/mount policy and bootstrap DB/user/password before reuse. Absent or matching
+stopped service starts with `up -d --no-recreate postgres`; running service is not
+restarted/recreated for failed readiness. Mismatch, Docker access/config/exec errors,
+unsupported state or failed startup stops clearly. Readiness uses
+`exec -T postgres pg_isready -U <effective-user> -d <derived-name>` with a 60-second
+deadline; Docker calls use 30-second timeouts (180 for initial start/image pull)
+and a 2-second forced-kill grace. Passwords/inspection contents are not
+printed. `pg_isready` is not authentication proof: preflight's real connection is.
+
+Preflight runs Flyway from `db/ledger`, Hibernate validation, then a proxied
+transaction taking exclusive locks on all five ledger tables. Exactly one matching
+owner is accepted unchanged; a generation-zero owner is inserted only when every
+ledger table is empty and fsync/synchronous_commit are on. Foreign/multiple owners,
+headless nonempty state, query/connection/migration/durability or failed/uncertain
+commit cannot seed or launch integrations. No error is reclassified as fresh
+storage and no data is reset/deleted. Concurrent preflights serialize in PostgreSQL.
+The default standalone runtime still never auto-seeds; explicit diagnostic init
+remains compatible but is no longer a dev prerequisite.
+
+An ignored `.dev-server.lock` holds a kernel lock from before build through final
+Java shutdown, refusing a second launcher in the same checkout. Do not remove the
+file while a process holds it. This is not cross-checkout/distributed bot exclusion;
+one operator/process must own the bot. Ctrl-C stops backend resources, not PostgreSQL.
+Storage persists across stop/start/restart of the same container, but container
+removal/recreation loses it; see [storage lifecycle](../deploy/README.md).
+These implemented checks do not establish real DB durability or live bot readiness.
 
 ### Optional Telegram configuration
 
@@ -97,7 +140,7 @@ These bind `longnest.telegram.enabled/token/user`. The already-required
 `LONGNEST_LEDGER_OWNER` is the internal principal, supplied only after the adapter
 authenticates that user's non-bot private-chat message. Launcher loading and
 inherited-env precedence apply unchanged; direct Spring/Java startup does not
-read `.env.dev`. Compose does not pass these values to either process. Enabled
+read `.env.dev`. Compose does not inject Telegram settings into PostgreSQL. Enabled
 startup contacts Telegram and PostgreSQL; do not run it as a synthetic smoke.
 No token, user identity, live startup or Telegram message has been configured here.
 
@@ -109,7 +152,7 @@ The same literal loader also supports the optional `LONGNEST_DEEPSEEK_ENABLED`,
 The [server fallback documentation](../apps/server/README.md#opt-in-deepseek-capture-fallback)
 defines required settings, timeout/recovery limits and separate live egress/spend
 approval. Omission keeps deterministic interpretation; this launcher grants no
-provider permission. Compose does not consume or forward these names.
+provider permission. Compose does not forward these names into PostgreSQL.
 Native conversation leaves output-token limits unset for provider/model defaults;
 legacy DEEPSEEK_MAX_TOKENS is not mapped. Output length/cost are not guaranteed.
 
@@ -147,11 +190,13 @@ node scripts/dev-server.test.mjs
 ```
 
 Node's built-in tests copy the launcher into temporary synthetic repositories,
-use fake Maven/Java executables and a Maven-produced synthetic JAR, and invoke from outside root. They test
+use fake Docker/Maven/Java executables and a Maven-produced synthetic JAR, and invoke from outside root. They test
 quoting, literal payloads, inherited precedence, missing/unreadable/invalid config,
-build-before-run without a prebuilt JAR, build failure despite a stale JAR, build
+build-before-run without a prebuilt JAR, build failure despite a stale JAR, Compose
+paths/credential precedence, absent/stopped/running/mismatched storage, bounded
+readiness, preflight failures, checkout exclusion, build
 environment isolation, exact invocation, exit status and SIGINT/SIGTERM during
-build and runtime (runtime retains the launcher PID). No dependency
+build/init and runtime (runtime retains the launcher PID). No dependency
 installation, real private env read, Java, DB, provider or container is involved.
 The test prints its retained temporary fixture directory. Node is needed only for
 these checks, not for running the Bash launcher. This is launcher evidence, not

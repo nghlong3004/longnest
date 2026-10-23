@@ -7,7 +7,7 @@ JPA/Flyway code are accepted. An opt-in TelegramBots SDK capture/get/recent adap
 including bounded Next/Previous and current-record selection, is implemented with
 synthetic boundaries; its current candidate/disposition is in
 CURRENT STATUS. PostgreSQL execution remains unverified.
-Vietnamese MessageSource presentation, explicit operator-only owner initialization,
+Vietnamese MessageSource presentation, guarded first-use owner initialization,
 edit/Save/Cancel/confirmed Delete/Restore, and inclusive range summaries/lists now
 have local synthetic acceptance. First-release deterministic flows are implemented;
 PostgreSQL durability, live Telegram UX and release acceptance remain unverified.
@@ -43,9 +43,9 @@ paid execution and financial-data egress are not verified or authorized.
 - [Agent entrypoint](AGENTS.md): mandatory instructions and context routing.
 - [Disposable PostgreSQL dev definition](deploy/README.md): usage/storage limits;
   not a running database, deployment or permission to start containers.
-- [Backend dev launcher](scripts/README.md): automatic Maven package/tests then
-  explicit root `.env.dev` runtime loading;
-  normal ledger startup can run Flyway and requires separate database scope.
+- [Backend dev launcher](scripts/README.md): one command loads root `.env.dev`,
+  packages/tests, ensures local dev PostgreSQL readiness, migrates/prepares the
+  configured owner, then runs; actual runtime effects require operator authority.
 
 Read the relevant branch, not every document. Links point to canonical sources;
 this tree is an index, not write ownership or evidence that a design exists in code.
@@ -102,8 +102,9 @@ longnest/
 
 Directory names are deliberately lowercase. `docs/WORK_STATUS.md` remains the sole
 status source; no status migration is needed. The existing server starter is
-preserved. Only the disposable dev database's public placeholders are defined in
-Compose. The explicit backend launcher can load private `.env.dev` values; no
+preserved. The safe example defines disposable DB placeholders; Compose now uses
+the launcher's effective datasource credentials and derived local DB name. The
+backend launcher loads private `.env.dev` values; no
 private values were read/configured and no database/backend runtime was started.
 Deployment remains unconfigured. Environment roles and partly proposed
 precedence are in [Delivery](docs/DELIVERY.md#environment-convention-proposal).

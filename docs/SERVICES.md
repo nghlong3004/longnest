@@ -190,12 +190,21 @@ the frozen identity/reference/intent, never a fresh operation.
 Flyway versioned SQL owns schema/PK/FK/index/unique/check/sequence definitions;
 JPA mapping metadata mirrors them. Use Hibernate validation, never schema auto-
 update/create/drop, including integration fixtures that claim migration evidence.
-Initialize empty storage and its owner head only on explicit first initialization;
-normal reopen fails if established storage/schema is missing or unsupported.
+Direct ordinary runtime never seeds an owner; missing/unsupported storage fails.
+The dev launcher now explicitly prepares storage on every launch before integrations:
+under the same exclusive table locks and proxied transaction, prepareOwner accepts
+exactly one matching configured owner, or inserts generation zero only if all five
+ledger tables are empty and durability is on. No missing-owner exception, connection
+failure or failed migration is treated as empty storage. Concurrent preparations
+serialize; failed/uncertain commit stops the launcher. A later run must read actual
+committed state anew. No overwrite, reset, retry-on-error seed or distributed bot
+lease is added. The checkout-local launcher lock excludes overlapping local runs.
 The bounded operator-only `ledger-init` profile now implements this procedure:
-it includes ledger wiring, excludes Telegram even if enabled, checks durability,
+it includes ledger wiring, excludes Telegram/DeepSeek even if enabled, checks durability,
 locks/checks all ledger tables for emptiness, inserts a generation-zero head via
-the proxied service, and closes the application. It is never a Telegram or future
+the proxied service, and closes the application. Its internal initialize-if-absent
+option selects prepareOwner for the dev preflight; default diagnostic init remains
+strictly empty-only and is not a required operator step. It is never a Telegram or future
 model/tool capability. See the server README and CURRENT STATUS for the exact
 candidate and synthetic-only evidence; no real database initialization is claimed.
 No migration execution is authorized by this design. Applied migrations are not

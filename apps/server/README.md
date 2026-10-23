@@ -213,10 +213,11 @@ evidence, not a network packet capture or PostgreSQL integration test.
 
 For explicitly authorized host development startup, use the
 [root `.env.dev` launcher](../../scripts/README.md). One command automatically runs
-Maven package with tests, then launches the resulting JAR with the existing
-`ledger` profile and required DataSource/personal-owner configuration. Unlike the
-isolated smoke below, it can contact PostgreSQL and run Flyway; it has not been
-executed against a database. Direct `java -jar` does not itself load `.env.dev`.
+Maven package with tests, prepares matching local Compose PostgreSQL/readiness,
+then migrates/validates/prepares the configured owner using the existing one-shot
+init boundary before launching the JAR under `ledger`. Unlike isolated smoke, this
+can start PostgreSQL/contact it/run Flyway. It has not been executed against a
+database. Direct `java -jar` does not itself load `.env.dev` or auto-seed an owner.
 
 Normal configuration retains PostgreSQL/JPA and Flyway auto-configuration. Hibernate
 validates rather than creates/updates schema, and SQL initialization is disabled.
@@ -226,39 +227,41 @@ Normal runtime is non-web, enables managed virtual threads and keeps the JVM ali
 the unused DeepSeek chat model is disabled with `spring.ai.model.chat=none`, without
 dummy credentials. No mail host is configured; Telegram remains disabled by default.
 
-### Explicit first-use owner initialization
+### Automatic first use in the dev launcher
 
-After an operator has separately provisioned an authorized PostgreSQL database,
-run the packaged JAR once with `ledger-init`. This profile includes `ledger`, so
-Flyway must migrate and Hibernate must validate the real schema; it does not
-disable persistence or seed on ordinary startup. Supply these values privately
-in the caller's environment (shown with placeholders only):
-
-```text
-SPRING_DATASOURCE_URL=jdbc:postgresql://<authorized-host>:5432/<database>
-SPRING_DATASOURCE_USERNAME=<database-user>
-SPRING_DATASOURCE_PASSWORD=<private-password>
-LONGNEST_LEDGER_OWNER=<personal-owner-id>
-```
-
-Then, from `apps/server`, invoke:
+Configure root `.env.dev` with the tracked [safe example](../../.env.example).
+With Docker's local daemon and the documented tools already available, the only
+startup command, from the repository root, is:
 
 ```sh
-java -jar target/longnest-0.0.1-SNAPSHOT.jar --spring.profiles.active=ledger-init
+bash scripts/dev-server.sh
 ```
 
-Direct `java -jar` does not load `.env.dev`; this command does not use or weaken
-the existing development launcher. Initialization checks PostgreSQL `fsync=on`
-and `synchronous_commit=on`, locks the ledger tables, and commits the generation-0
-owner head only if **every** head, entry, create-inbox, control and control-event
-table is empty. It closes the
-application after the proxied transaction returns. A nonempty/missing schema,
-missing credentials/owner, downgraded durability or failed/uncertain commit must
-not be treated as success; inspect storage before any retry. Normal `ledger`
-startup never initializes a missing head. `ledger-init` excludes the Telegram
-SDK even if `LONGNEST_TELEGRAM_ENABLED=true` is inherited. The initializer is an
-operator-only command, never a Telegram action or future model/tool capability.
-No database or live bot run has been performed for this candidate.
+No separate mode, exports, owner-init command or operator JAR handling is needed.
+The same effective file/inherited datasource settings configure PostgreSQL and Java;
+the launcher only accepts the local URL/identifier contract in [its guide](../../scripts/README.md).
+Existing container configuration mismatch fails rather than reconfiguring it.
+Fresh/stopped matching service starts without recreation; running unready service
+is polled within a bounded deadline. Failures never trigger a reset or fresh seed.
+
+Internally the launcher first runs `ledger-init` with
+`longnest.ledger.initialize-if-absent=true`. Flyway must migrate and Hibernate must
+validate before a proxied transaction checks `fsync=on`, `synchronous_commit=on`
+and takes exclusive locks on all five ledger tables. Exactly one configured owner
+is accepted unchanged; a generation-zero owner is inserted only if **every** head,
+entry, create-inbox, control and control-event table is empty. A foreign/multiple
+owner, headless nonempty state, query failure or failed/uncertain commit stops
+startup; inspect storage before retry. Concurrent preparation is serialized by
+those transaction locks. The process closes after proxy completion; only a zero
+exit permits the normal `ledger` process and enabled integrations to start.
+
+`ledger-init` excludes Telegram/DeepSeek even when enabled. Its default strict
+empty-only diagnostic behavior remains compatible, but is no longer a required
+operator action. Direct normal `ledger` runtime still never initializes a missing
+head. No schema or production auto-seeding change is made. The initializer is never
+a Telegram/model tool. A checkout-local lock refuses overlapping dev launchers;
+cross-checkout bot ownership remains the operator's responsibility. No database,
+container or live bot execution was performed for this candidate.
 
 ## Opt-in Telegram SDK boundary
 
@@ -708,10 +711,10 @@ versions are separate from business revision/generation. Saved source/creation
 instants are truncated to microseconds before persistence/cursor use. The creation
 instant is captured in the server write unit, not a measured PostgreSQL commit time.
 
-There is deliberately **no owner-head seed or automatic recreation**. An operator
-or separately authorized isolated fixture must explicitly establish the head with
-generation zero on first initialization. Missing head always fails, never an empty
-ledger. The adapter also fails if the database reports fsync or synchronous_commit
+Normal runtime never seeds or recreates an owner head. The dev preflight alone
+may establish generation zero under the authoritative empty-storage checks above.
+Missing head during ordinary operations always fails, never an empty-ledger result.
+The adapter also fails if the database reports fsync or synchronous_commit
 other than `on`; it does not change server settings. Actual lock SQL, settings,
 constraints and migration compatibility still need PostgreSQL execution evidence.
 Technical host identifiers are bounded to 200 Java string units, never truncated.

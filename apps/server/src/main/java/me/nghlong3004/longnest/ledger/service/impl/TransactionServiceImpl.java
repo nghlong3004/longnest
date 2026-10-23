@@ -80,12 +80,21 @@ public class TransactionServiceImpl implements TransactionService {
 
   @Override
   public void initializeOwner(HostContext context) {
+    store.initializeOwner(startupPrincipal(context));
+  }
+
+  @Override
+  public void prepareOwner(HostContext context) {
+    store.prepareOwner(startupPrincipal(context));
+  }
+
+  private String startupPrincipal(HostContext context) {
     String principal = owner.authorize(context);
     if (context.operationId() != null || context.businessReference() != null
         || context.messageAt() != null) {
       throw new LedgerException(LedgerException.Code.INVALID_FIELD);
     }
-    store.initializeOwner(principal);
+    return principal;
   }
 
   @Override

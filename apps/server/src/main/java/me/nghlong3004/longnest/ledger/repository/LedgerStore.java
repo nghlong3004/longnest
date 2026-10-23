@@ -14,6 +14,8 @@ import me.nghlong3004.longnest.ledger.pagination.LedgerCursors;
 public interface LedgerStore {
   void initializeOwner(String owner);
 
+  void prepareOwner(String owner);
+
   long lockHead(String owner);
 
   Optional<Inbox> inbox(String owner, String operationId);

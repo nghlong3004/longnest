@@ -89,6 +89,30 @@ class LedgerProxyTests {
   }
 
   @Test
+  void devPreparationUsesProxyTransactionAndPropagatesUncertainCommit() {
+    var target = new TransactionServiceImpl(owner, store,
+        new TransactionMapper(VALIDATORS.getValidator(),
+            Mappers.getMapper(TransactionRepresentationMapper.class)),
+        Clock.fixed(NOW, ZoneOffset.UTC), new ControlProofs());
+    var interceptor = new TransactionInterceptor();
+    interceptor.setTransactionManager(manager);
+    interceptor.setTransactionAttributeSource(new AnnotationTransactionAttributeSource());
+    var proxy = new ProxyFactory(target);
+    proxy.setInterfaces(TransactionService.class);
+    proxy.addAdvice(interceptor);
+    var transactions = (TransactionService) proxy.getProxy();
+    doAnswer(call -> {
+      assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isTrue();
+      return null;
+    }).when(store).prepareOwner("personal");
+    manager.failCommit = 1;
+    assertThatThrownBy(() -> transactions.prepareOwner(
+        new HostContext("personal", null, null, null))).isInstanceOf(TransactionSystemException.class);
+    assertThat(manager.events).containsExactly("begin", "commit-failed");
+    assertThat(TransactionSynchronizationManager.isActualTransactionActive()).isFalse();
+  }
+
+  @Test
   void l2AdapterSeparatesConfirmedRollbackFromUnknownCommitAndSharesProxyBoundary() {
     var proof = new ControlProofs().issue("tg:123:77", 101, "callback-1",
         "a".repeat(32), 42, 1);

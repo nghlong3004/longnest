@@ -36,11 +36,21 @@ public class JpaLedgerStore implements LedgerStore {
 
   @Override
   public void initializeOwner(String owner) {
+    initializeOwner(owner, false);
+  }
+
+  @Override
+  public void prepareOwner(String owner) {
+    initializeOwner(owner, true);
+  }
+
+  private void initializeOwner(String owner, boolean allowExisting) {
     // One-time initialization must serialize even two different proposed owners.
     entityManager.createNativeQuery(
         "lock table ledger_owner_head, ledger_entry, ledger_create_inbox, ledger_control, ledger_control_event in exclusive mode")
         .executeUpdate();
     requireDurability();
+    if (allowExisting && heads.count() == 1 && heads.existsById(owner)) return;
     if (heads.count() != 0 || entries.count() != 0 || inboxes.count() != 0
         || controls.count() != 0 || controlEvents.count() != 0) {
       throw unavailable();

@@ -101,7 +101,9 @@ a schema change. Freeze writes and reconcile rather than blindly overwrite a led
   application role and separately controlled migration/restore authority; do not
   log connection secrets or silently downgrade transport protection.
   A missing/unavailable established database/schema must not create an empty ledger.
-  Distinguish explicit first initialization from reopening; recovery is never an
+  The dev launcher may prepare authoritatively fresh storage automatically after
+  migrations, or accept its sole matching owner; direct ordinary runtime does not
+  seed. Distinguish first initialization from reopening; recovery is never an
   automatic overwrite or truncation. Keep backup/retention policy separate from
   ten-minute action/cursor usability expiry. Do not mistake request/connection
   timeout for confirmed rollback; recover uncertain results by the same operation ID.
@@ -139,12 +141,16 @@ No private `.env`/`.env.dev` file was read, created or changed. The explicit
 [backend dev launcher](../scripts/README.md) now loads **root `.env.dev` only** using
 a strict literal grammar, never shell sourcing/evaluation. The one-command launcher
 packages with Maven/tests before executing Java; file-loaded runtime values are
-applied only to Java, not Maven. Its implemented
+applied to Docker/Compose and Java, not Maven. Its implemented
 precedence is application defaults → `.env.dev` → exported process environment
 (including explicit empty values); it selects only the existing `ledger` profile.
-Direct Spring startup does not import dotenv files. Compose's fixed-value
+Direct Spring startup does not import dotenv files. Compose's interpolated
 [dev definition](../deploy/README.md#what-environment-files-actually-configure) is
-separate and does not load the application's `.env.dev` in its documented commands.
+uses the same effective datasource settings through the launcher and explicit
+root `.env.dev` interpolation input. The launcher derives the strictly local DB
+name, starts only absent/stopped matching service without recreation, waits for
+readiness and performs guarded owner preparation before normal runtime. No manual
+Docker/init command, profile switch, exports or JAR handling is required.
 No database/backend runtime was started. Verify existing ignore rules before any
 commit containing runtime material; private env files must stay excluded.
 

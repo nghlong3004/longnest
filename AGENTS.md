@@ -31,6 +31,10 @@ no general pending workflow, new tool/schema or live effects.
 RULES-LLM-ROUTING-1 extends enabled routing to parser recognition failures,
 including legacy rejected grammar, without overriding financial validation,
 storage/auth/replay/proof failures or changing default-off parsing.
+DEV-FIRST-USE-1 authorizes single-command dev-launch implementation: managed local
+Compose readiness and authoritative fresh-owner preparation before integrations.
+This supersedes separate explicit init/container startup for this dev workflow
+only, not ordinary runtime auto-seeding or permission to execute live effects here.
 No live messaging/data egress, paid/LLM calls, deployment, DB installation or broad
 infrastructure/credential changes. Inspected project baseline/increment Git stage,
 commit and push are authorized only with usable existing permissions and verified

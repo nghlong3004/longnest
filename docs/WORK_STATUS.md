@@ -7,7 +7,172 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### DEV-FIRST-USE-1 — ACCEPT guarded single-command startup
+
+Publication is now explicitly assigned for this accepted candidate only. Same
+Lead reconciled released/idle Peers and unchanged ownership; no source writer is
+active. Fresh manifest/archive digests and all22 hashes reproduce, with exactly23
+related public paths and no unrelated/untracked outgoing content. Reuse recorded
+648 Java tests,63 synthetic launcher tests and isolated smoke; none rerun for Git
+publication. Author/committer Long, branchmain/upstreamorigin-main and authorized
+origin git@github.com:nghlong3004/longnest.git were inspected; independent remote
+main still equals base3048e11. Private env/generated/private state remain excluded.
+A separate pre-existing stopped Java job was observed in apps/server; no arguments/
+private env were inspected and no process was started/resumed/stopped by this Git
+task. Leave unrelated operator runtime state untouched; frozen source hashes match.
+Normal commit/push outcome follows without a postcommit status-only commit loop.
+
+Final Lead disposition: ACCEPT repaired22-path source/docs manifest
+`apps/server/target/dev-first-use-evidence.4WTpty/candidate-final.sha256`, SHA-256
+`404164165f93a1fa9b8ed1a4c708ab64d1aa1184418e0b7065af4bd8189d3224`.
+Archive `candidate-final.tar.gz` in that directory, SHA-256
+`9e4a237a2cd9bd9b76d6cb33d82c651deb8fd0441da29f7007f6b38f083d3144`.
+Base remains3048e118634d6929a096a69a34c440e5b1ea4b65; WORK_STATUS is the23rd
+changed public path, excluded from the frozen manifest for status updates. All
+writers/builds/fixtures are stopped. Peer handoff is closed with no remaining
+assignment; Lead owns the stopped source. No stage/commit/push is requested/taken.
+The following progress/rejected-candidate notes are historical checkpoints.
+
+Usable operator path: `bash scripts/dev-server.sh` only. Literal root .env.dev and
+inherited precedence are retained. Builds/tests first, ensures local Docker/Compose
+PostgreSQL running/ready, uses one-shot migrated/validated transactional owner
+preparation, then execs normal ledger backend. No extra mode/manual exports/profile
+switch/JAR handling. Config contract: exactly
+`jdbc:postgresql://127.0.0.1:54329/NAME`; NAME/user are ASCII identifiers up to63
+characters. Derive internal LONGNEST_DEV_DB_NAME from URL; effective datasource
+username/password drive Compose interpolation and Java consistently. Compose
+always uses absolute root/.env.dev and deploy/compose.dev.yaml, projectlongnest-dev.
+Only absent/matching stopped postgres starts with --no-recreate. Existing running
+service is never restarted for readiness; mismatched container configuration,
+remote Docker/JDBC endpoints, Docker access/exec errors or readiness expiry stop.
+Readiness limit60s; Docker default30s/start180s, plus forced-kill grace2s. No host
+daemon startup, permission changes, mounts, reset/removal or production provisioning.
+
+Preflight excludes both integrations. Exclusive locked storage accepts exactly one
+matching owner, or initializes generation zero only if all five ledger tables are
+empty with durability on. Storage/query/migration/owner or uncertain-commit failure
+never means fresh state or starts normal backend; no destructive recovery. Direct
+ordinary runtime remains non-seeding. Existing diagnostic strict init is retained
+but not required. Local flock persists across phases/final exec; cross-checkout/
+distributed bot exclusion remains operator responsibility. Ctrl-C/error does not
+stop/remove PostgreSQL; same-container stop/start/restart preserves data, whereas
+deliberate removal/recreation loses this disposable cluster. No real finance-data
+durability claim follows from container-layer storage.
+
+Final checks:63/63 launcher synthetic cases in `launcher-repaired.log`, including
+both Peer findings and stopped/nonzero Maven distinctions;648 Java package tests,
+zero failures/errors/skips, and isolated smoke exit0. Reuse package/smoke only after
+fresh hash verification that all10 changed server paths remain identical to that
+tested snapshot; repairs affect shell/tests/public operational docs only. Both Peer
+findings are closed by Lead repair/regression evidence, not by the rejected
+candidate's prior passes. Fresh syntax/whitespace,22 source hashes,23 public paths,
+106 local doc targets, Compose contract/mount/secret-like scans and ignored/untracked
+private env checks pass. Env export cannot overwrite resolved helper controls;
+colliding original env names are still passed literally. No .env/.env.dev values
+were read/changed, no real Docker/DB/provider/Telegram/network/paid call occurred.
+No new schema/dependency, financial/UI/tool/memory/confirmation behavior changes.
+
+Complete changed paths: `.env.example`, `.gitignore`, `AGENTS.md`, `README.md`,
+`apps/server/README.md`; server Java `ledger/config/LedgerInitConfiguration.java`,
+`ledger/repository/JpaLedgerStore.java`, `ledger/repository/LedgerStore.java`,
+`ledger/service/TransactionService.java`, `ledger/service/impl/TransactionServiceImpl.java`;
+tests `ledger/config/LedgerInitConfigurationTests.java`,
+`ledger/repository/JpaLedgerStoreUnitTests.java`, `ledger/service/LedgerProxyTests.java`,
+`ledger/service/LedgerUnitTests.java`; `deploy/README.md`, `deploy/compose.dev.yaml`,
+`docs/DECISIONS.md`, `docs/DELIVERY.md`, `docs/SERVICES.md`, `docs/WORK_STATUS.md`,
+`scripts/README.md`, `scripts/dev-server.sh`, `scripts/dev-server.test.mjs`.
+Residual limits: mocks/source checks do not verify actual Docker context/plugin/
+template/image behavior, PostgreSQL migration/locks/durability/reopen or live bot/
+provider quality/latency/cost. The operator's original Jansi failure exit status
+is still unknown; repaired stop-status handling is not proof of its root cause.
+No permissions/credential/global Maven settings were changed. Passing local
+checks are not live activation authority; default-off integration flags remain.
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns launcher, bounded startup/init
+service/store wiring, synthetic fixtures and affected public guidance from base
+`3048e118634d6929a096a69a34c440e5b1ea4b65`. Same session/room reconciled;
+prior Peers remain released/idle, no concurrent writer or new assignment. Preserve
+the intentional post-publication status note; no other pending source changes.
+Authorized outcome: the existing no-argument dev command loads .env.dev, builds/
+tests, prepares genuinely fresh storage or verifies its configured owner, then
+runs normally. This supersedes separate explicit init as a dev prerequisite only.
+Extended authority includes managed dev Compose startup/readiness in this same
+launcher, superseding separate Docker startup for this workflow only. Effective
+datasource names drive container credentials and a strictly local JDBC URL supplies
+its database name. Reuse/start only the named dev service without recreation;
+refuse mismatched existing container configuration, remote endpoints and readiness/
+Docker errors. All Docker/DB effects in verification remain synthetic fakes.
+Preparation uses authoritative locked storage and existing transaction/durability/
+empty-table checks, not exception-driven missing-owner inference; uncertain/failing
+migration/init stops startup before integrations. Keep direct normal runtime
+non-seeding and explicit diagnostic init compatible. Checkout-local launcher
+exclusion prevents overlapping local runs; no distributed bot lease is selected.
+Verify mock-storage/profile/transaction cases and fake-tool launcher sequencing,
+failure/interruption/concurrency/env secrecy, then freeze a bounded candidate.
+No private env access/edit, actual DB/provider/Telegram/container execution, paid calls,
+new schema/framework, Git commit/push or destructive reset is assigned.
+
+Moving implementation also reproduces a phase-runner defect independently with
+shell-only fakes: job-control plain wait returned147 for a stopped job whose final
+exit was0. Use wait-f for true termination and numeric build diagnostics; true
+nonzero exits still fail. This corrects the owned runner, not a proven diagnosis
+of the operator's Jansi exception. Repository401/Mockito warnings and BUILD SUCCESS
+text do not establish Maven exit status; original operator status remains unknown.
+Focused Java checks pass78 tests. First expanded launcher run58/59 was blocked by
+ENOSPC copying a host utility into a synthetic fixture; replaced fixture copies
+with symlinks and moved new evidence/fixtures to ignored target on the spacious
+project filesystem, preserving all prior files. Subsequent59/59 pass; final
+runner regressions now pass61/61. No real Docker, Maven-network or private env
+was involved in launcher checks. Full offline Java package is running locally.
+
+Source/docs candidate frozen:22 public implementation paths in
+`apps/server/target/dev-first-use-evidence.4WTpty/candidate.sha256`, SHA-256
+`2056bcd5203153d43e80f81e0078b419303224d9e4f433d01a076b942a77ef46`;
+WORK_STATUS excluded for evidence updates. Fresh read-only Peer
+`4f388fb9-41fc-4066-80a6-54fb849e8bba` inspects state/env/failure/no-recreate/
+owner/integration ordering with no writes/builds/private env or external calls.
+Selected current slp-peer/gpt-6.1-sol/medium profile; no read-only runtime mode
+exists, so auto plus explicit read-only scope. Lead retains every write scope and
+will not change listed files until inspection closes. No dependent assignment.
+
+Exact frozen candidate verification now passes:61 launcher cases (fake Docker/
+Maven/Java),648 Java package cases with zero failures/errors/skips, isolated smoke
+exit0 with non-web context/managed virtual-thread execution, bash syntax and
+whitespace. Evidence under `apps/server/target/dev-first-use-evidence.4WTpty/`:
+`launcher-final.log`, `package.log`, `smoke.log`; prior focused log at
+`/tmp/longnest-dev-first-use-focused.log` (78 cases). Offline existing Maven cache,
+Java25.0.4.1/Maven3.10.0, isolated env/empty user and global settings; no private
+file values reach builds. Fresh22-path hashes plus23 public path/content checks,
+106 local doc targets, Compose interpolation/mount boundaries and ignored/untracked
+private env checks pass. Pattern scan is not exhaustive secret detection. All
+local build/fixture writers finished; review still pending, so no final acceptance.
+
+Peer submitted/stopped with all22 hashes unchanged. ACCEPT both P2 findings and
+REJECT2056bcd5...ef46 for final acceptance: arbitrary env exports could replace
+Docker helper's validated tools/database/timeout controls; TERM-ignoring clients
+could exceed a timeout without forced-kill escalation. No additional init or
+integration-ordering defect found statically. Peer loop explicitly closed; no
+write ownership acquired. Lead owns only these repairs/regressions and matching
+docs from the rejected snapshot; its source freeze is lifted for Lead alone.
+Freeze argv/derived name before exports, remove script-array attributes in the
+Docker subshell, and use timeout kill-after2. New tests cover inherited/file control
+collisions and a TERM-ignoring fake Docker. Java source remains unchanged, so its
+648-test/package and isolated-smoke evidence can be reused after hash verification.
+
 ### Publication — accepted amount clarification and native fallback
+
+Published commit `3048e118634d6929a096a69a34c440e5b1ea4b65`
+(`Complete amount clarification and rules-first native fallback`) includes the19
+reviewed public paths for both accepted increments. Normal SSH push to
+`git@github.com:nghlong3004/longnest.git`, `main:main`, succeeded. Independent
+post-push ls-remote confirms this exact hash at refs/heads/main; local main and
+origin/main match, divergence0/0, with origin/main upstream. Prior635-test/package
+and isolated smoke evidence is reused against freshly verified unchanged source;
+no tests/builds or app provider/DB/Telegram calls were made during publication.
+No private env/generated state was staged, no force/credential/permission change
+occurred. Only this post-publication status note remains intentionally uncommitted;
+no status-only amend/commit loop. Live language quality, latency/cost, PostgreSQL
+durability and live Telegram UX remain unverified; integrations stay default-off.
 
 Explicit publication authority now covers AMOUNT-CLARIFICATION-1 plus
 RULES-LLM-ROUTING-1 only. Same Lead owns publication; all source writers and

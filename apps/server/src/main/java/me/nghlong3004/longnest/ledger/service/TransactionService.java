@@ -33,6 +33,14 @@ public interface TransactionService {
   void initializeOwner(HostContext context);
 
   /**
+   * Verifies the sole configured owner, or initializes only authoritatively empty storage.
+   *
+   * @param context trusted owner with no operation identity or source timestamps
+   * @throws LedgerException for unauthorized/invalid context, inconsistent storage or unavailable DB
+   */
+  void prepareOwner(HostContext context);
+
+  /**
    * Lists at most ten frozen, uncompleted creates for an authenticated adapter namespace.
    *
    * @param context trusted principal; no source time or new operation is required
