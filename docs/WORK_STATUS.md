@@ -135,6 +135,13 @@ query delivery may re-interpret/re-read current state; no exactly-once reply or
 provider-charge guarantee. PostgreSQL/init/live Telegram scope/config/evidence
 remain separate and outstanding, not a prerequisite imposed on this code task.
 Reviewed local Git commit follows with existing identity/main; no remote or push.
+Committed locally as `0d76abf9d42163454b95411e8f8463389ad9ba7e` —
+`Add typed explicit-date conversational range queries`, parent
+`1767ce779d3a84bd4fe1b56617de797fc199a47c`; 20 inspected paths, 725 insertions,
+35 deletions. Staged/live content matched; whitespace and credential/excluded-path
+checks passed, no private/generated/protected paths included. Tree was clean after
+commit. Only this post-commit hash/outcome record remains intentionally unstaged;
+no documentation-only follow-up commit/amend loop and no push/destination guess.
 
 ### DS-FALLBACK-1 — ACCEPT default-off capture interpretation, synthetic/local only
 
