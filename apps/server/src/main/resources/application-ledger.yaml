@@ -1,0 +1,10 @@
+# Opt-in unfinished ledger wiring; this profile does not grant database execution authority.
+spring:
+  flyway:
+    locations: classpath:db/ledger
+  jpa:
+    properties:
+      hibernate:
+        cache:
+          use_second_level_cache: false
+          use_query_cache: false

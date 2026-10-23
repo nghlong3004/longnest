@@ -1,0 +1,30 @@
+spring:
+  profiles:
+    group:
+      ledger-init: ledger
+  application:
+    name: longnest
+  messages:
+    basename: messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+  main:
+    web-application-type: none
+    keep-alive: true
+  threads:
+    virtual:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+  sql:
+    init:
+      mode: never
+  ai:
+    model:
+      chat: none
+
+longnest:
+  telegram:
+    enabled: false
