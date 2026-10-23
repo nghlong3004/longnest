@@ -14,6 +14,15 @@ OOP use cases and future tools; Telegram is an adapter, not the business layer.
 
 ## Selected first-release grammar
 
+The grammar below is asserted transaction capture, not questions. Recognized
+read-request cues/question marks now route to clarification or the default-off
+NL-QUERY-1 interpreter before capture. Its separate LIST_RANGE intent requires
+two explicit ordered ISO endpoints and income/expense/all source evidence;
+relative dates/context and arbitrary query filters are not inferred. See
+[adapter boundary](features/adapters/README.md) and CURRENT STATUS. This guard does
+not prohibit punctuation in structured Note edits or typed transaction inputs;
+authenticated field prompts retain their explicit edit → Save semantics.
+
 One text message specifies at most one transaction. Reject line breaks/semicolons
 before whitespace normalization. Normalize Unicode to NFC, trim ends, collapse
 whitespace and match phrases/suffixes case-insensitively.

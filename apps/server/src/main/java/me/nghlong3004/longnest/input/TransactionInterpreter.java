@@ -83,6 +83,9 @@ public final class TransactionInterpreter implements InputInterpreter {
       return problem(NEEDS_CLARIFICATION, MISSING_AMOUNT, "amountMinor");
     }
     String lower = text.toLowerCase(Locale.ROOT);
+    if (RangeQueryInterpreter.isQuery(text)) {
+      return RangeQueryInterpreter.clarify();
+    }
     if (text.startsWith("/") || UNSUPPORTED_CUES.matcher(lower).find()) {
       return problem(UNSUPPORTED, UNSUPPORTED_INPUT, "text");
     }

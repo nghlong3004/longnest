@@ -5,6 +5,7 @@ import java.util.Currency;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import java.util.concurrent.Future;
@@ -25,7 +26,7 @@ import org.springframework.ai.chat.prompt.Prompt;
 import org.springframework.core.task.AsyncTaskExecutor;
 import tools.jackson.databind.json.JsonMapper;
 
-/** Rules-first capture only. Provider output is evidence-checked then parsed by the same rules. */
+/** Rules-first capture and explicit range reads; provider output is evidence-checked locally. */
 @RequiredArgsConstructor
 public final class DeepSeekInterpreter implements InputInterpreter {
   private static final Set<String> FIELDS =
@@ -72,18 +73,28 @@ public final class DeepSeekInterpreter implements InputInterpreter {
   @Override
   public InterpretationResult interpret(String message) {
     var local = rules.interpret(message);
-    if (!requiresRecovery(message)) return local;
+    boolean query = local instanceof Problem problem && problem.code() == Code.QUERY_CLARIFICATION;
+    var source = query ? RangeQueryInterpreter.source(message)
+        : Optional.<RangeQueryInterpreter.Source>empty();
+    if (query && source.isEmpty()) return local;
+    if (!query && !requiresRecovery(message)) return local;
     Future<ChatResponse> pending = null;
     try {
-      pending = executor.submit(() -> model.call(new Prompt(List.of(new SystemMessage(SYSTEM),
+      pending = executor.submit(() -> model.call(new Prompt(List.of(
+          new SystemMessage(query ? RangeQueryInterpreter.SYSTEM : SYSTEM),
           new UserMessage(message)))));
       var response = pending.get(10, TimeUnit.SECONDS);
       if (response == null || response.getResults().size() != 1
           || !"stop".equalsIgnoreCase(response.getResult().getMetadata().getFinishReason())
-          || response.getResult().getOutput().hasToolCalls()) return clarification();
+          || response.getResult().getOutput().hasToolCalls()) {
+        return query ? RangeQueryInterpreter.clarify() : clarification();
+      }
       String text = response.getResult().getOutput().getText();
-      if (text == null || text.length() > 2048) return clarification();
+      if (text == null || text.length() > 2048) {
+        return query ? RangeQueryInterpreter.clarify() : clarification();
+      }
       var tree = json.readTree(text);
+      if (query) return RangeQueryInterpreter.decode(message, source.orElseThrow(), tree, json);
       if (!tree.isObject() || tree.size() != FIELDS.size()
           || !Set.copyOf(tree.propertyNames()).equals(FIELDS)
           || FIELDS.stream().anyMatch(key -> !tree.path(key).isString())) return clarification();
@@ -107,10 +118,10 @@ public final class DeepSeekInterpreter implements InputInterpreter {
       return ready;
     } catch (InterruptedException interrupted) {
       Thread.currentThread().interrupt();
-      return unavailable();
+      return query ? RangeQueryInterpreter.unavailable() : unavailable();
     } catch (ExecutionException | TimeoutException | RuntimeException unavailableOrInvalid) {
       // Neither exception messages nor model content are safe to log or show to users.
-      return unavailable();
+      return query ? RangeQueryInterpreter.unavailable() : unavailable();
     } finally {
       if (pending != null && !pending.isDone()) pending.cancel(true);
     }

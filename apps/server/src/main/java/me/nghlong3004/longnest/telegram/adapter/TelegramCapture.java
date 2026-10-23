@@ -152,6 +152,9 @@ public class TelegramCapture {
       send(message.getChat().getId(), replies.problem(problem));
       return true;
     }
+    if (interpreted instanceof InterpretationResult.ListRange queryIntent) {
+      return browse(context, Route.first(new RangeSelection(queryIntent.range(), queryIntent.filter())));
+    }
     var draft = ((InterpretationResult.Ready) interpreted).draft();
     return respondReceipt(context, ledger.create(context, mapper.input(draft)));
   }

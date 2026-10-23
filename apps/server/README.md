@@ -11,7 +11,7 @@ changed. Docker/container execution is not part of this verification.
 
 ## Opt-in DeepSeek capture fallback
 
-`InputInterpreter` is the reusable draft/clarification boundary. Normal ledger
+`InputInterpreter` is the reusable draft/read-intent/clarification boundary. Normal ledger
 wiring selects the existing rules. `LONGNEST_DEEPSEEK_ENABLED=true` selects rules
 first plus `DeepSeekInterpreter`; init/smoke cannot construct this provider binding.
 The existing `org.springframework.ai:spring-ai-starter-model-deepseek` and BOM
@@ -21,15 +21,15 @@ documents Boot 4.0/4.1 support; [DeepSeek integration](https://docs.spring.io/sp
 documents the selected `DeepSeekApi`/`DeepSeekChatModel` manual binding. Actual
 Java25/Boot4.1.1 local evidence belongs in CURRENT STATUS, not these documentation claims.
 
-This increment interprets **single capture only**, not natural-language queries,
-dates, edits or model tools. Only `UNSUPPORTED/UNKNOWN_PHRASE` with one exact locally
+The **capture route** does not interpret relative dates, edits or model tools.
+Only `UNSUPPORTED/UNKNOWN_PHRASE` with one exact locally
 parseable amount and conservative lexical safety checks is eligible. Ready,
 rejected, missing-fact, ambiguous, conflicting, relative-date, debt/transfer and
 explicit-command paths never reach the model. Spelled units nghìn/ngàn/triệu may
 normalize locally; bare 45 remains 45 dong. Unsafe or unsupported syntax stays local.
 No general natural-language safety or prompt-injection guarantee is claimed.
 
-Model output has exactly four string fields: `status`, `canonicalText`,
+Capture model output has exactly four string fields: `status`, `canonicalText`,
 `amountEvidence`, `typeEvidence`. CREATE is re-parsed with the existing rules;
 the amount must equal locally extracted evidence and its original substring.
 The note must occur in the source text; explicit type cues must agree. Unknown/
@@ -47,6 +47,59 @@ Unavailable storage stops interpretation. New drafts pass the same validated
 ingest/create service; success is rendered only after its transaction proxy returns.
 No database transaction is held during the provider call. Other adapters must
 follow this recovery rule and supply their own trusted event context, never model IDs.
+
+### Conversational explicit-date queries
+
+NL-QUERY-1 extends the same default-off interpreter with **LIST_RANGE | CLARIFY**,
+not a native tool/agent loop. Synthetic example interactions:
+
+- `Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-23.` → expense summary and list.
+- `Liệt kê khoản thu từ 2026-10-01 đến 2026-10-23.` → income summary and list.
+- `Xem giao dịch từ 2026-10-01 đến 2026-10-23.` → income/expense/net and list.
+- `Mình đã chi bao nhiêu từ ngày 2026-10-01 tới ngày 2026-10-23?` → expense total
+  plus selectable entries, not a model-calculated amount.
+- `Cho tôi các khoản chi hôm qua` → Vietnamese clarification for two explicit dates;
+  no context/date inference, query or mutation.
+
+This is a small step toward ordinary conversation, not full conversational
+understanding. Recognized request cues/questions are guarded **before capture**,
+even when the provider is disabled; they cannot fall through as purchases.
+Clear asserted capture still saves immediately. Field-prompt replies and explicit
+commands/callbacks keep their existing routing and real-user confirmation rules.
+The lexical question guard is bounded, not a guarantee to recognize every phrasing.
+
+Supported source range: exactly two real `YYYY-MM-DD` dates in source order using
+`từ [ngày] A đến/tới [ngày] B` (documented accentless aliases also work), inclusive,
+1900–9999, A <= B. An equal-endpoint range is one day. Income/expense/all scope must
+be explicit; both types use `thu và chi`/`thu chi`, or general `giao dịch`.
+Missing/reversed/invalid dates, conflicting scope, known unsupported category,
+currency, amount/ID qualifiers, action requests and relative/contextual dates clarify
+without a provider call. No silent date repair, swapping, endpoint/type default,
+foreign currency conversion or target inference. Unrecognized semantics still
+depend on model clarification; finite source checks do not prove arbitrary language.
+
+The query JSON has exactly six string fields: `intent`, `from`, `to`, `filter`,
+`intentEvidence`, `filterEvidence`. Only LIST_RANGE with matching literal source
+endpoints, allowed INCOME/EXPENSE/ALL and original request/scope evidence becomes
+an immutable ListRange intent. CLARIFY, foreign/duplicate fields, tool calls,
+truncation or a capture-shaped result cannot dispatch any query or mutation.
+Failed interpretation uses query-specific Vietnamese guidance, not a purchase receipt.
+
+Authenticated Telegram dispatch calls existing `LedgerClient.list`/`LedgerQueryService.list`;
+the existing renderer presents exact full-range summary/counts/net and ten-entry
+pages. Next/Previous use existing bounded cursors; selection re-gets the current
+revision and exposes existing L2 controls. **No records/results go back to the
+model**, no second inference/narration and no model-supplied principal/proof/SQL.
+New read events do not freeze create intents; repeated query delivery may re-read
+current state/reinterpret, not write a transaction. There is no exactly-once
+provider-charge or read-response delivery claim.
+
+Provider-disabled operation offers clarification/explicit commands rather than
+silently activating inference. Query and capture share the existing activation
+names and bounded SDK settings below; no new dependency or env key was introduced.
+No multi-turn memory, follow-up fragment completion, fuzzy record selection,
+relative-date grounding or natural-language Edit/Delete/Restore is implemented.
+Explicit commands and authenticated buttons remain available for those ledger flows.
 
 After separate live approval only, privately inject these names (no values here):
 

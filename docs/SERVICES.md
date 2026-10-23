@@ -329,15 +329,21 @@ the same application boundary; there is no direct-update bypass for future tools
 
 ## Future interpretation strategies
 
-Rules-first DeepSeek capture fallback is now selected for DS-FALLBACK-1;
+Rules-first DeepSeek capture fallback (DS-FALLBACK-1) and explicit-date read
+interpretation (NL-QUERY-1) are selected for bounded default-off code;
 live endpoint/model approval, egress/privacy and monetary limits remain unresolved.
 See [exact routing/configuration](../apps/server/README.md#opt-in-deepseek-capture-fallback)
 and CURRENT STATUS for implementation acceptance. Default remains local rules.
-InputInterpreter returns only a draft or clarification, not host context, saved
-claims, arithmetic or action proof. No model tools or natural-language query/date/
-edit dispatcher is installed by this increment.
+InputInterpreter returns a validated draft, immutable ListRange read intent or
+clarification, not host context, saved claims, arithmetic or action proof. The host
+dispatches ListRange through existing LedgerClient.list/query service and renders
+its matching full-range summary and selectable page directly, without model result
+egress or another inference. Explicit ISO source endpoints and type/all evidence
+are locally checked. Read-request classification precedes capture; missing dates
+clarify rather than creating a purchase. No native tools, relative-date/context
+resolution or natural-language edit/action dispatcher is installed.
 
-Before eligible nondeterministic interpretation, the authenticated host invokes
+Before eligible nondeterministic capture interpretation, the authenticated host invokes
 TransactionService.recoverCreateIfPresent through LedgerClient. Its short
 transaction recovers a frozen create/original receipt or explicitly returns empty;
 unavailable/conflicting storage is not absence. The provider runs outside that

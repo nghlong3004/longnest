@@ -76,7 +76,7 @@ flowchart TB
     Q["LedgerQueryService [Component]<br/>Authorized get/recent/aggregate/filtered list"]
     V["Domain model [Component]<br/>Transaction lifecycle, Money, DateRange and date invariants"]
     P["LedgerStore persistence adapter [Component]<br/>Spring Data JPA / Hibernate repositories<br/>Flyway-owned schema; atomic mutation/action/result"]
-    F["DeepSeek capture fallback [Opt-in code, no live acceptance]<br/>Validated draft only; no tool/confirmation/store privilege"]
+    F["DeepSeek interpretation [Opt-in capture/range reads, no live acceptance]<br/>Validated intent only; no tool/confirmation/store privilege"]
   end
   D[("Ledger store [Data-store container]<br/>PostgreSQL — approved database")]
   T -->|Updates and authenticated user actions over HTTPS| A
@@ -93,11 +93,11 @@ flowchart TB
   C -->|Business receipt or action prompt| A
   Q -->|Business totals, transaction or page| A
   A -->|Rendered response over HTTPS Bot API| T
-  I -.->|Selected default-off unknown-prose capture fallback| F
-  F -.->|Evidence-checked draft through trusted host| A
+  I -.->|Selected default-off capture or explicit-date read interpretation| F
+  F -.->|Evidence-checked draft or ListRange through trusted host| A
 ```
 
-Solid paths are current design; dotted paths show the selected default-off capture
+Solid paths are current design; dotted paths show selected default-off capture/read
 fallback, not live transmission. A general tool adapter and interpreter replacement
 remain absent. No route bypasses application authorization, exact Money/DateRange validation,
 idempotency, revision checks or durable consistency. Services return business results
@@ -147,8 +147,9 @@ is an update, not a separate financial implementation or reporting service.
 - Future client: React latest, TypeScript 7, Vite latest and Tailwind CSS latest in
   `apps/client/`, accessing the same server/ledger after an authentication/API design
   is approved. No public API endpoints or frontend are defined/implemented now.
-- Optional LLM: selected default-off DeepSeek capture fallback uses the same typed
-  draft/application services. Broader tools and interpreter replacement are absent.
+- Optional LLM: selected default-off DeepSeek capture and explicit-date range reads
+  use typed draft/read intents and existing services. Broader tools and interpreter
+  replacement are absent; no query records/results return to the model.
   See [strategy examples](SERVICES.md#future-interpretation-strategies). Provider/
   cost/privacy approval precedes any external text processing; no live agent
   platform, model-owned store, access grant or confirmation shortcut.

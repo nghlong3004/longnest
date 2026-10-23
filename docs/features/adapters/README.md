@@ -1,11 +1,11 @@
 # Later adapters — A1 LLM and A2 web
 
-A1 has a bounded capture implementation; broader A1/A2 remain later scope, not
+A1 has bounded capture and explicit-date read-intent implementations; broader A1/A2 remain later scope, not
 prerequisites for current CRUD, daily budget or salary advice.
 [Services](../../SERVICES.md) owns typed capabilities/tool mappings;
 [Domain](../../DOMAIN.md#input-to-normalized-contract) owns the normalized boundary;
 [C4](../../ARCHITECTURE.md) owns architecture. Do not copy financial rules here.
-DS-FALLBACK-1 implements the bounded A1 capture subset under CURRENT STATUS;
+DS-FALLBACK-1 and NL-QUERY-1 implement bounded A1 subsets under CURRENT STATUS;
 no Peer is assigned. A2 and a general model tool/intent dispatcher do not exist.
 
 The deterministic ledger's L1–L3 code now has bounded synthetic/local acceptance;
@@ -23,7 +23,13 @@ handwritten provider HTTP client, and is disabled by default. Only safe
 UNKNOWN_PHRASE capture can be interpreted; money/source/type evidence and the same
 rules validate the JSON result. Frozen create recovery precedes another provider
 attempt. No natural-language date/query/edit/delete dispatcher or model tools are
-installed. See [server configuration/limits](../../../apps/server/README.md#opt-in-deepseek-capture-fallback).
+installed by DS-FALLBACK-1. NL-QUERY-1 adds only LIST_RANGE | CLARIFY for explicit
+ISO endpoints and income/expense/all scope, through the same default-off binding.
+The host calls existing query services and renders exact totals/pages/current
+selection directly; no ledger results return to the model and no native tools or
+multi-call loop exists. Recognized questions cannot fall into capture. Relative
+dates, follow-up context and natural-language actions remain absent.
+See [server configuration/limits](../../../apps/server/README.md#opt-in-deepseek-capture-fallback).
 Proposals below describe broader A1, not claims those capabilities now exist.
 
 **Outcome/examples:** user supplies complete phrasing outside current grammar; a

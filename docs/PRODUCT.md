@@ -46,7 +46,10 @@ has a complete preview → real-user Save or Cancel path; clear creation still s
 immediately. Same event/action replay returns its original result, while distinct
 clear purchase messages save independently. See Services for failure/revision rules.
 
-Rules-first DeepSeek capture fallback now has bounded default-off implementation;
+Rules-first DeepSeek capture and explicit-date range-query interpretation now have
+bounded default-off implementation, a step toward ordinary conversational use,
+not full understanding or multi-turn memory. Relative dates and conversational
+action requests remain absent;
 interpreter replacement is not selected. Broader future model intents/requests
 must call the same application services.
 A model can request an action but not supply authorization or human delete proof.

@@ -19,6 +19,8 @@ synthetic/local build/smoke checks under named scopes in CURRENT STATUS. Missing
 durable/runtime evidence is not waived by this code authority.
 DS-FALLBACK-1 additionally authorizes default-off DeepSeek interpretation code and
 fake-provider/local verification, not provider activation, credentials or egress.
+NL-QUERY-1 extends that code authority to bounded explicit-date read intents and
+direct local rendering, not native tools, conversational memory or live effects.
 No live messaging/data egress, paid/LLM calls, deployment, DB installation or broad
 infrastructure/credential changes. Inspected project baseline/increment Git stage,
 commit and push are authorized only with usable existing permissions and verified

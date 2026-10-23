@@ -1,6 +1,8 @@
 package me.nghlong3004.longnest.input;
 
 import java.util.Objects;
+import me.nghlong3004.longnest.domain.DateRange;
+import me.nghlong3004.longnest.domain.RangeFilter;
 import me.nghlong3004.longnest.domain.TransactionDraft;
 
 /** Internal interpretation only; ready means validated input, never a saved transaction. */
@@ -24,12 +26,27 @@ public sealed interface InterpretationResult {
     INVALID_AMOUNT,
     INVALID_FIELD,
     MODEL_CLARIFICATION,
-    INTERPRETER_UNAVAILABLE
+    INTERPRETER_UNAVAILABLE,
+    QUERY_CLARIFICATION,
+    QUERY_UNAVAILABLE
   }
 
   record Ready(TransactionDraft draft) implements InterpretationResult {
     public Ready {
       Objects.requireNonNull(draft, "draft");
+    }
+
+    @Override
+    public Status status() {
+      return Status.READY;
+    }
+  }
+
+  /** Validated read metadata only; never a cached result, principal or method name. */
+  record ListRange(DateRange range, RangeFilter filter) implements InterpretationResult {
+    public ListRange {
+      Objects.requireNonNull(range, "range");
+      Objects.requireNonNull(filter, "filter");
     }
 
     @Override

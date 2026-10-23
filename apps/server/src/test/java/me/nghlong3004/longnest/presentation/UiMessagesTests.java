@@ -125,6 +125,16 @@ public class UiMessagesTests {
   }
 
   @ParameterizedTest
+  @EnumSource(value = InterpretationResult.Code.class, names = {"QUERY_CLARIFICATION", "QUERY_UNAVAILABLE"})
+  void readClarificationsAskNaturallyForDatesWithoutCaptureOrSavedClaims(InterpretationResult.Code code) {
+    var problem = new InterpretationResult.Problem(InterpretationResult.Status.NEEDS_CLARIFICATION,
+        code, "text", "Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-23.");
+    assertThat(replies.problem(problem)).startsWith("Mình")
+        .contains("hai ngày cụ thể", "YYYY-MM-DD", problem.example(), "Chưa có dữ liệu nào bị thay đổi")
+        .doesNotContain("Đã lưu", "Vui lòng gửi lại một giao dịch", "QUERY_", "amountMinor");
+  }
+
+  @ParameterizedTest
   @ValueSource(strings = {"ăn trưa", "45k", "mua sách 80k", "ăn trưa 0", "+45k ăn trưa",
       "ăn trưa 45.000", "ăn trưa 45k; cà phê 20k", "-45k sách 2"})
   void reachableClarificationsRenderVietnameseWithoutLeakingFieldNames(String input) {

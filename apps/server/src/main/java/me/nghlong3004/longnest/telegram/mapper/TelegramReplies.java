@@ -3,6 +3,7 @@ package me.nghlong3004.longnest.telegram.mapper;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import me.nghlong3004.longnest.input.InterpretationResult;
 import me.nghlong3004.longnest.input.InterpretationResult.Problem;
 import me.nghlong3004.longnest.ledger.dto.LedgerResult;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
@@ -172,6 +173,11 @@ public class TelegramReplies {
   public String invalidRange() { return messages.text("range.invalid"); }
 
   public String problem(Problem problem) {
+    if (problem.code() == InterpretationResult.Code.QUERY_CLARIFICATION
+        || problem.code() == InterpretationResult.Code.QUERY_UNAVAILABLE) {
+      return messages.text("query.clarification", messages.text("error." + problem.code()),
+          problem.example());
+    }
     return messages.text("problem.body", messages.text("problem.status." + problem.status()),
         messages.text("error." + problem.code()), messages.text("field." + problem.field()),
         problem.example());
@@ -217,6 +223,6 @@ public class TelegramReplies {
   }
 
   public String help() {
-    return messages.text("help.body");
+    return messages.text("help.body") + "\n" + messages.text("help.queryHint");
   }
 }

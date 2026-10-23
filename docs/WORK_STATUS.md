@@ -7,6 +7,135 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### NL-QUERY-1 — ACCEPT explicit-date conversational reads, synthetic/local only
+
+Base: accepted commit `1767ce779d3a84bd4fe1b56617de797fc199a47c`, 102-file server
+manifest `8f5240edcec13091c8b7754ff3d6f6262e9dd25893b25e0ff8b9e0afeaaa12b4`
+reproduced before writes. Only existing working change was the post-commit status
+outcome. Lead `8442a05c-6421-45c4-adc7-65b64111c30f` owns implementation/shared
+docs/integration; existing Peers remain idle/released, no dispatch or extra session.
+
+Outcome: LIST_RANGE | CLARIFY for conversational requests with two explicit ISO
+dates and income/expense/all scope; ordinary questions must not become purchases.
+Reuse Spring AI/default-off config, host-owned context, LedgerClient.list and the
+existing exact summary/selectable page/current-record/L2 controls. One interpreted
+read, direct Vietnamese rendering, no ledger-result egress or second model call.
+Scope: cohesive input classification/typed schema/evidence validation, narrow
+Telegram dispatch and localized messages, fake-response/query-navigation tests and
+minimal canonical docs. No new dependency/schema, relative dates, multi-turn
+memory, inferred target/action requests or native tools/agent loop. Existing clear
+capture/recovery and host-only Save/Delete proof stay unchanged.
+
+Verification: inspect stable source, fake model/SDK/service callbacks, proportional
+offline package and isolated smoke; no DB/Telegram/provider/container/private-env/
+paid/deployment effects. Live endpoint/model/data/privacy/cost choices remain
+unresolved, independently from code readiness. Exact candidate/paths/results and
+explicit technical disposition will follow; commit only reviewed verified paths
+with existing identity/main, no push or invented destination.
+
+Stable Lead handoff/review: implementation/build writers stopped, no Peer scope
+reopened. ACCEPT exact 104-file server manifest
+`4f49515dde4df9fa18f067d0b8214626e6244fb0135502e76201c40644b1e977`.
+Frozen evidence: `/tmp/longnest-nl-query-lead.1eG5tB/candidate-server.sha256` and
+`candidate-server.tar.gz`, archive SHA-256
+`702aca85e561486310e5186af3ba26f602b9ec1c647c5c4cb9b39858bde3c6e3`.
+Versus base: 93 server files unchanged, nine modified, two added, none removed.
+POM/dependencies, Spring AI factory/activation settings, schema, services/store,
+MapStruct mappings and financial/control logic are unchanged.
+
+Implementation: one cohesive stateless RangeQueryInterpreter guard/validator and
+an immutable ListRange result in the existing sealed interpretation boundary.
+DeepSeekInterpreter composes the read branch with its existing one-request SDK/
+deadline/strict-JSON handling. No command hierarchy, native function registration,
+agent framework or extra provider client. Recognized read cues/questions take
+precedence over capture even with inference off; valid clear capture, frozen-event
+recovery and authenticated field-prompt/command/callback routing remain intact.
+
+Supported standalone examples (fake-model verified, not live language claims):
+`Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-23.`,
+`Liệt kê khoản thu từ 2026-10-01 đến 2026-10-23.`,
+`Xem giao dịch từ 2026-10-01 đến 2026-10-23.`, and
+`Mình đã chi bao nhiêu từ ngày 2026-10-01 tới ngày 2026-10-23?`.
+Source must contain exactly two valid ISO endpoints, ordered in explicit
+`từ [ngày] A đến/tới [ngày] B`, with explicit income/expense/all scope. Equal
+endpoints mean one day. No swapped/repaired/default endpoints, relative dates,
+prior-message facts, inferred targets or arbitrary category/amount/currency filters.
+Known unsupported or missing facts clarify locally without a provider call;
+finite lexical checks do not establish unrestricted language understanding.
+
+Query wire schema has exactly six string fields: intent/from/to/filter/
+intentEvidence/filterEvidence. Only LIST_RANGE with matching literal endpoints,
+enum filter and original request/scope evidence becomes a read intent; CLARIFY,
+foreign/duplicate fields, capture-shaped output, native tool calls or truncation
+never dispatch a query or mutation. Queries bypass create-inbox recovery/ingest;
+the authenticated host calls existing LedgerClient.list/query service and directly
+renders its exact same-snapshot full-range summary and ten-entry selectable page.
+Next/Previous/current-state get/L2 controls use existing bounded navigation, without
+another model call or ledger/result egress. Model output cannot supply principal,
+operation identity, SQL/method, proof or authoritative amounts/counts/net.
+
+Verification: Temurin Java25.0.4.1/Maven3.10.0/Linux WSL2; isolated environment,
+empty user/global Maven settings, offline existing cache. Focused parser/presentation
+run passed287; integration-focused run passed119 (intermediate scopes). Final
+package passed **562 tests, zero failures/errors/skips**, versus base526 (+36).
+Standalone isolated smoke exit0, non-web managed virtual-thread execution and
+closure. Logs: `focused.log`, `integration-focused.log`, `package.log`, `smoke.log`
+under the frozen directory. No failed Maven/test run occurred in this increment;
+existing Mockito/Unsafe warnings remain nonfatal. Added checks cover all filters,
+single-day/missing/invalid/reversed endpoints, conflicting scope, cross-route and
+foreign-field rejection, query/capture separation, natural Vietnamese clarification,
+unauthorized actors, exact service dispatch/full-range rather than page totals,
+paging/current revision/L2 controls and no second provider/mutation call.
+
+Executable JAR contains the new query/result types and generated mapper, without
+smoke YAML/test launcher. Static checks: 21 public Markdown files/199 local targets,
+balanced fences, 99 unique Vietnamese keys, changed-file whitespace clean. Source
+hashes reproduced after verification; no Java/Maven/background writer remains.
+No private env read/edit, DB/Telegram/provider/container call, paid effect or
+deployment. These results accept bounded code, not PostgreSQL durability, live UX,
+provider quality or full R1–R19 acceptance.
+
+Complete changed paths (two new files; all others modified, none deleted):
+
+```text
+AGENTS.md
+README.md
+apps/server/README.md
+apps/server/src/main/java/me/nghlong3004/longnest/input/DeepSeekInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/InterpretationResult.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/TransactionInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/RangeQueryInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/telegram/adapter/TelegramCapture.java
+apps/server/src/main/java/me/nghlong3004/longnest/telegram/mapper/TelegramReplies.java
+apps/server/src/main/resources/messages_vi.properties
+apps/server/src/test/java/me/nghlong3004/longnest/input/RangeQueryInterpreterTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/presentation/UiMessagesTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/telegram/TelegramRangeTests.java
+docs/ARCHITECTURE.md
+docs/DECISIONS.md
+docs/DOMAIN.md
+docs/PRODUCT.md
+docs/SERVICES.md
+docs/WORK_STATUS.md
+docs/features/adapters/README.md
+```
+
+Disposition/next frontier: this enables bounded full-date conversational reads,
+not full conversation. Relative-date grounding, follow-up/clarification memory,
+fragment completion, fuzzy records and natural-language Edit/Delete/Restore remain
+absent; existing explicit commands and authenticated controls still implement the
+approved ledger flows. Any later conversational increment needs its own bounded
+grounding/context/action contract, not a generic tool platform or another ledger
+feature gate. Live use still needs explicit endpoint/model, permitted source-data,
+privacy/retention/region/terms, private API credential custody and monetary/session
+request limits. The same LONGNEST_DEEPSEEK_ENABLED/API_KEY/BASE_URL/MODEL names apply;
+default off, existing connect2/read8/overall10-second limits, no retry/tools and
+512-token output cap. No ledger results are submitted to the provider. Repeat
+query delivery may re-interpret/re-read current state; no exactly-once reply or
+provider-charge guarantee. PostgreSQL/init/live Telegram scope/config/evidence
+remain separate and outstanding, not a prerequisite imposed on this code task.
+Reviewed local Git commit follows with existing identity/main; no remote or push.
+
 ### DS-FALLBACK-1 — ACCEPT default-off capture interpretation, synthetic/local only
 
 Explicit continuation selects deterministic rules first, DeepSeek fallback only;
@@ -150,6 +279,13 @@ live Telegram readiness remain independently unverified. Broader natural-languag
 queries/dates/action dispatch are intentionally outside this bounded capture scope.
 Existing Git authority permits a reviewed local increment with the coherent
 configured identity/main branch; no remote exists, so no push/destination guess.
+Local increment committed as `1767ce779d3a84bd4fe1b56617de797fc199a47c` —
+`Add default-off rules-first DeepSeek capture fallback`, parent baseline
+`4a570246e6b9585287587a5642f2e72a43e8050b`; 28 reviewed paths, 997 insertions,
+50 deletions. Staged/live content and credential/excluded-path checks passed;
+no private/generated/protected guidance was staged, no config/remote changed.
+Tree was clean immediately after commit. Only this post-commit hash/outcome record
+is intentionally uncommitted; no documentation-only follow-up commit/amend loop.
 
 This section supersedes the historical docs-only authority/ownership below.
 Lead `8442a05c-6421-45c4-adc7-65b64111c30f` owns root/shared docs, ignore rules,
@@ -748,7 +884,8 @@ migration/init/runtime scope, private DataSource/owner config, then separately
 authorized Telegram token/user activation and actual UX checks. Do not send secrets
 in chat. Backup/custody/retention decisions remain operational, no purge is approved.
 
-Rules-first DeepSeek capture is now selected for DS-FALLBACK-1; replacement is not.
+Rules-first DeepSeek capture (DS-FALLBACK-1) and explicit-date read intents
+(NL-QUERY-1) are selected; replacement is not.
 Live endpoint/model, privacy/egress/retention/cost limits and private credential
 custody remain unresolved. Fake-provider checks do not establish provider quality
 or authorize even synthetic outbound trials. Typed application capabilities remain
