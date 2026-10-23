@@ -35,7 +35,7 @@ public interface LedgerQueryService {
    *
    * @param context authenticated host identity
    * @param range validated inclusive financial dates
-   * @param filter all, income or expense; never inferred from transaction text
+   * @param filter all, income, expense or expense entries in Category.FOOD only
    * @return exact totals/counts/net and observed generation; no financial mutation
    * @throws LedgerException for unauthorized identity, missing head or invalid range/filter
    */
@@ -46,7 +46,7 @@ public interface LedgerQueryService {
    *
    * @param context authenticated host identity
    * @param range validated inclusive financial dates
-   * @param filter all, income or expense
+   * @param filter all, income, expense or expense entries in Category.FOOD only
    * @param cursor absent for page one, otherwise bound to owner/range/filter/generation
    * @return at most ten entries ordered date/ID descending with same-snapshot summary
    * @throws LedgerException for unauthorized identity, invalid input or invalid/stale cursor

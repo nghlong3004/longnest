@@ -12,7 +12,8 @@ import me.nghlong3004.longnest.domain.RangeFilter;
 public record RangeSummary(
     @NotNull @Valid @Schema(description = "Inclusive Asia/Ho_Chi_Minh financial-date range")
         DateRange range,
-    @NotNull @Schema(description = "Selected transaction type filter") RangeFilter filter,
+    @NotNull @Schema(description = "ALL, INCOME, EXPENSE or Category.FOOD expenses")
+        RangeFilter filter,
     @NotNull @Schema(description = "Currency", example = "VND") String currency,
     @NotNull @Pattern(regexp = "0|[1-9][0-9]*") @Schema(description = "Exact income VND total")
         String incomeTotal,

@@ -125,7 +125,7 @@ public class UiMessagesTests {
   }
 
   @ParameterizedTest
-  @EnumSource(value = InterpretationResult.Code.class, names = {"QUERY_CLARIFICATION", "QUERY_UNAVAILABLE"})
+  @EnumSource(value = InterpretationResult.Code.class, names = {"QUERY_CLARIFICATION"})
   void readClarificationsAskNaturallyForDatesWithoutCaptureOrSavedClaims(InterpretationResult.Code code) {
     var problem = new InterpretationResult.Problem(InterpretationResult.Status.NEEDS_CLARIFICATION,
         code, "text", "Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-23.");

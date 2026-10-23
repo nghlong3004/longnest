@@ -32,6 +32,11 @@ public class TelegramNavigation {
   private final SecureRandom random;
   private final LinkedHashMap<String, Visit> visits = new LinkedHashMap<>();
 
+  public synchronized boolean knownMessage(long chat, Integer message) {
+    return message != null && visits.values().stream().anyMatch(visit -> visit.chat() == chat
+        && visit.message() == message && clock.instant().isBefore(visit.expiresAt()));
+  }
+
   public record Route(Optional<String> cursor, List<Optional<String>> previous,
       Optional<String> entryId, Optional<RangeSelection> selection) {
     public Route {
@@ -64,16 +69,19 @@ public class TelegramNavigation {
     }
 
     private String code() {
-      String type = switch (filter) { case ALL -> "a"; case INCOME -> "i"; case EXPENSE -> "e"; };
+      String type = switch (filter) {
+        case ALL -> "a"; case INCOME -> "i"; case EXPENSE -> "e"; case FOOD -> "f";
+      };
       return type + range.from().format(DateTimeFormatter.BASIC_ISO_DATE)
           + range.to().format(DateTimeFormatter.BASIC_ISO_DATE);
     }
 
     private static RangeSelection parse(String code) {
-      if (!code.matches("[aie][0-9]{16}")) throw new IllegalArgumentException("Invalid query");
+      if (!code.matches("[aief][0-9]{16}")) throw new IllegalArgumentException("Invalid query");
       RangeFilter filter = switch (code.charAt(0)) {
         case 'a' -> RangeFilter.ALL;
         case 'i' -> RangeFilter.INCOME;
+        case 'f' -> RangeFilter.FOOD;
         default -> RangeFilter.EXPENSE;
       };
       return new RangeSelection(new DateRange(

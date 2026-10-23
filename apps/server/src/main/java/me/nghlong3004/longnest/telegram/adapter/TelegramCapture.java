@@ -5,12 +5,15 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.LinkedHashSet;
 import me.nghlong3004.longnest.domain.DateRange;
 import me.nghlong3004.longnest.domain.RangeFilter;
 import me.nghlong3004.longnest.telegram.model.TelegramNavigation.RangeSelection;
 import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
+import lombok.Setter;
+import me.nghlong3004.longnest.conversation.ConversationAssistant;
 import me.nghlong3004.longnest.input.InterpretationResult;
 import me.nghlong3004.longnest.input.InputInterpreter;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
@@ -21,6 +24,7 @@ import me.nghlong3004.longnest.ledger.dto.FieldPrompt;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
 import me.nghlong3004.longnest.ledger.dto.TransactionPage;
 import me.nghlong3004.longnest.ledger.dto.TransactionView;
+import me.nghlong3004.longnest.ledger.dto.RangeSummary;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
 import me.nghlong3004.longnest.ledger.model.HostContext;
 import me.nghlong3004.longnest.ledger.model.ControlProofs;
@@ -57,6 +61,8 @@ public class TelegramCapture {
   private final Clock clock;
   private final TelegramNavigation navigation;
   private final ControlProofs proofs;
+  @Setter private ConversationAssistant conversation;
+  private final Set<Integer> conversationalReplies = new LinkedHashSet<>();
   private String warnedOperation;
 
   public boolean handle(Update update) {
@@ -118,11 +124,20 @@ public class TelegramCapture {
           : Optional.of(text.substring(8).trim());
       return browse(context, new Route(cursor, List.of(), Optional.empty()));
     }
+    if (text.equals("/reset") && conversation != null) {
+      conversation.reset(context);
+      conversationalReplies.clear();
+      send(settings.getUser(), replies.conversation("conversation.reset"));
+      return true;
+    }
     if (text.startsWith("/")) {
       send(message.getChat().getId(), replies.help());
       return true;
     }
-    if (message.getReplyToMessage() != null) {
+    if (message.getReplyToMessage() != null && !(conversation != null
+        && (conversationalReplies.contains(message.getReplyToMessage().getMessageId())
+            || navigation.knownMessage(settings.getUser(),
+                message.getReplyToMessage().getMessageId())))) {
       var replied = message.getReplyToMessage();
       if (replied.getMessageId() == null || replied.getMessageId() <= 0) {
         send(settings.getUser(), replies.stalePrompt());
@@ -138,22 +153,17 @@ public class TelegramCapture {
       }
       return sendPreview(context, preview);
     }
-    if (interpreter.requiresRecovery(text)) {
-      var recovery = ledger.recoverCreateIfPresent(context);
-      if (recovery instanceof LedgerResult.Failure<Optional<MutationReceipt>> failure) {
-        return respondReceipt(context, new LedgerResult.Failure<>(failure.code(),
-            failure.operationId(), failure.retryable()));
-      }
-      var prior = ((LedgerResult.Ok<Optional<MutationReceipt>>) recovery).data();
-      if (prior.isPresent()) return respondReceipt(context, new LedgerResult.Ok<>(prior.orElseThrow()));
-    }
     var interpreted = interpreter.interpret(text);
+    if (conversation != null && interpreted instanceof InterpretationResult.Problem problem
+        && problem.status() != InterpretationResult.Status.REJECTED
+        && problem.code() != InterpretationResult.Code.INVALID_AMOUNT
+        && problem.code() != InterpretationResult.Code.AMBIGUOUS_AMOUNT
+        && problem.code() != InterpretationResult.Code.CONFLICTING_TYPE) {
+      return conversationReply(context, conversation.reply(context, text));
+    }
     if (interpreted instanceof InterpretationResult.Problem problem) {
       send(message.getChat().getId(), replies.problem(problem));
       return true;
-    }
-    if (interpreted instanceof InterpretationResult.ListRange queryIntent) {
-      return browse(context, Route.first(new RangeSelection(queryIntent.range(), queryIntent.filter())));
     }
     var draft = ((InterpretationResult.Ready) interpreted).draft();
     return respondReceipt(context, ledger.create(context, mapper.input(draft)));
@@ -212,6 +222,7 @@ public class TelegramCapture {
   private boolean respondEntry(HostContext context, LedgerResult<TransactionView> result) {
     if (result instanceof LedgerResult.Ok<TransactionView> ok) {
       TransactionView entry = ok.data();
+      if (conversation != null) conversation.selected(context, entry);
       if (entry.state() == TransactionView.State.DELETED) {
         return sendRestoreEntry(context, entry, replies.view(entry));
       }
@@ -229,6 +240,7 @@ public class TelegramCapture {
     if (result instanceof LedgerResult.Ok<MutationReceipt> ok) {
       var receipt = ok.data();
       if (!receipt.replayed()) {
+        if (conversation != null) conversation.selected(context, receipt.transaction());
         if (receipt.transaction().state() == TransactionView.State.DELETED) {
           return sendRestoreEntry(context, receipt.transaction(), replies.receipt(receipt));
         }
@@ -394,12 +406,7 @@ public class TelegramCapture {
       result = queryPage(context, route);
     }
     if (result instanceof LedgerResult.Ok<TransactionPage> ok) {
-      String token = navigation.open(settings.getUser(), ok.data(), route);
-      Message sent = send(settings.getUser(), replies.page(ok.data()),
-          replies.keyboard(ok.data(), token, route.cursor().isPresent()));
-      navigation.bind(token, sent.getMessageId());
-      warnedOperation = null;
-      return true;
+      return sendPage(ok.data(), route);
     }
     return respond(context, result, replies::page);
   }
@@ -407,6 +414,43 @@ public class TelegramCapture {
   private LedgerResult<TransactionPage> queryPage(HostContext context, Route route) {
     return route.selection().map(selection -> ledger.list(context, selection.range(),
         selection.filter(), route.cursor())).orElseGet(() -> ledger.recent(context, route.cursor()));
+  }
+
+  private boolean sendPage(TransactionPage page, Route route) {
+    String token = navigation.open(settings.getUser(), page, route);
+    Message sent = send(settings.getUser(), replies.page(page),
+        replies.keyboard(page, token, route.cursor().isPresent()));
+    navigation.bind(token, sent.getMessageId());
+    warnedOperation = null;
+    return true;
+  }
+
+  private boolean conversationReply(HostContext context, ConversationAssistant.Reply reply) {
+    if (reply.messageKey() != null) {
+      Message sent = send(settings.getUser(), replies.conversation(reply.messageKey()), null);
+      if (conversationalReplies.size() >= 100) {
+        conversationalReplies.remove(conversationalReplies.iterator().next());
+      }
+      conversationalReplies.add(sent.getMessageId());
+      return true;
+    }
+    if (reply.result() instanceof LedgerResult.Failure<?> failure) {
+      return respond(context, failure, ignored -> "");
+    }
+    Object value = ((LedgerResult.Ok<?>) reply.result()).data();
+    if (value instanceof MutationReceipt receipt) return respondReceipt(context, new LedgerResult.Ok<>(receipt));
+    if (value instanceof ConfirmationRequired preview) return sendPreview(context, new LedgerResult.Ok<>(preview));
+    if (value instanceof TransactionView view) return respondEntry(context, new LedgerResult.Ok<>(view));
+    if (value instanceof TransactionPage page) {
+      Route route = page.summary().map(summary -> Route.first(
+          new RangeSelection(summary.range(), summary.filter()))).orElseGet(Route::first);
+      return sendPage(page, route);
+    }
+    if (value instanceof RangeSummary summary) {
+      send(settings.getUser(), replies.summary(summary));
+      return true;
+    }
+    throw new IllegalStateException("Unknown authoritative conversation result");
   }
 
   /** Resume bounded frozen creates even when their Telegram update has expired. */

@@ -13,9 +13,10 @@ have local synthetic acceptance. First-release deterministic flows are implement
 PostgreSQL durability, live Telegram UX and release acceptance remain unverified.
 See [server instructions](apps/server/README.md) and CURRENT STATUS for exact
 evidence and limits. No working ledger/bot, frontend or deployment is established.
-An explicitly opt-in, rules-first DeepSeek fallback supports capture and bounded
-conversational range reads with explicit ISO dates behind the reusable input
-boundary; default operation stays deterministic. Provider quality,
+An explicitly opt-in Spring AI native conversation route supports grounded
+relative-date reads, bounded follow-ups, FOOD-only filtering and standard service
+actions; default operation stays deterministic. Bespoke JSON interpreters are
+superseded. Provider quality,
 paid execution and financial-data egress are not verified or authorized.
 
 ## Context tree — start here

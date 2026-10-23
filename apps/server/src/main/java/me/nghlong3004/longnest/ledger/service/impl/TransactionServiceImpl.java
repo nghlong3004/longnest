@@ -20,6 +20,7 @@ import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
 import me.nghlong3004.longnest.ledger.dto.ControlBinding;
 import me.nghlong3004.longnest.ledger.dto.FieldPrompt;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
+import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import me.nghlong3004.longnest.ledger.dto.TransactionInput;
 import me.nghlong3004.longnest.ledger.dto.TransactionPatch;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
@@ -55,6 +56,27 @@ public class TransactionServiceImpl implements TransactionService {
   private final SecureRandom random = new SecureRandom();
   private static final Duration CONTROL_TTL = Duration.ofMinutes(10);
   private static final int CONTROL_LIMIT = 100;
+
+  @Override
+  public Optional<OperationRecovery> recoverOperation(HostContext context) {
+    String principal = owner.authorize(context);
+    requireControlContext(context);
+    store.lockHead(principal);
+    if (store.controlEventFingerprint(principal, context.operationId()).isPresent()) throw conflict();
+    var known = store.controlByRequest(principal, context.operationId());
+    if (known.isPresent()) {
+      Control control = known.orElseThrow();
+      if (!control.scope().equals(context.interactionScope())) throw conflict();
+      if (control.kind() == ControlKind.RESTORE && control.status() == ControlStatus.COMPLETED) {
+        return Optional.of(mapper.recovered(receipt(control, true)));
+      }
+      if (control.kind() == ControlKind.UPDATE || control.kind() == ControlKind.DELETE) {
+        return Optional.of(mapper.recovered(confirmation(control)));
+      }
+      throw conflict();
+    }
+    return recoverCreateIfPresent(context).map(mapper::recovered);
+  }
 
   @Override
   public void initializeOwner(HostContext context) {

@@ -261,6 +261,29 @@ class LedgerControlsTests {
   }
 
   @Test
+  void genericRecoveryReturnsFrozenPreviewAndRestoreOutcomeWithoutNewAction() {
+    assertThat(service.recoverOperation(host("absent"))).isEmpty();
+    var preview = service.previewUpdate(host("edit"), "42", "1", patch("40k", null), null);
+    var recovered = service.recoverOperation(host("edit")).orElseThrow();
+    assertThat(recovered.preview()).isEqualTo(preview);
+    assertThat(recovered.receipt()).isNull();
+    assertThat(controls).hasSize(1);
+    fails(() -> service.recoverOperation(new HostContext("personal", "edit", NOW, NOW, "other")),
+        LedgerException.Code.IDEMPOTENCY_CONFLICT);
+    var delete = service.requestDelete(host("delete"), "42", "1");
+    assertThat(service.recoverOperation(host("delete")).orElseThrow().preview()).isEqualTo(delete);
+    service.bindAction(host("delete"), delete.actionId(), 120);
+    service.confirmDelete(host("confirm"), delete.actionId(),
+        proofs.issue(SCOPE, 120, "real", delete.actionId(), 42, 1));
+    var restored = service.restore(host("restore"), "42", "2");
+    var replay = service.recoverOperation(host("restore")).orElseThrow().receipt();
+    assertThat(replay.replayed()).isTrue();
+    assertThat(replay.transaction()).isEqualTo(restored.transaction());
+    assertThat(generation).hasValue(2);
+    fails(() -> service.recoverOperation(host("confirm")), LedgerException.Code.IDEMPOTENCY_CONFLICT);
+  }
+
+  @Test
   void invalidReplyKeepsPromptPendingAndCancelIsIdempotent() {
     var prompt = service.openFieldPrompt(host("prompt"), "42", "1", EditField.AMOUNT, null);
     service.bindPrompt(host("prompt"), prompt.promptId(), 101);

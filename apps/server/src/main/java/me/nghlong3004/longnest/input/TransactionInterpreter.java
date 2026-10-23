@@ -32,6 +32,13 @@ import me.nghlong3004.longnest.input.InterpretationResult.Status;
 
 /** Stateless finite-grammar interpreter. Host date, identity and persistence remain outside it. */
 public final class TransactionInterpreter implements InputInterpreter {
+  /** Local capture guard only; conversational understanding belongs to native tools. */
+  public static boolean isQuery(String text) {
+    return text.matches("(?is).*[?？﹖].*") || Pattern.compile(
+        "(?iu)(?<![\\p{L}\\p{N}_])(?:xem|liệt kê|liet ke|thống kê|thong ke|tổng|tong|bao nhiêu|bao nhieu|cho biết|cho biet|cho tôi|cho toi|cho mình|cho minh|báo cáo|bao cao|danh sách|danh sach|các khoản|cac khoan|những khoản|nhung khoan|có phải|co phai|đúng không|dung khong|thế nào|the nao|bao tiền|bao tien)(?![\\p{L}\\p{N}_])")
+        .matcher(text).find();
+  }
+
   private static final String EXAMPLE = "-45k đồ dùng";
   private static final Map<String, Category> PHRASES =
       Map.ofEntries(
@@ -46,10 +53,17 @@ public final class TransactionInterpreter implements InputInterpreter {
           entry("lương", Category.SALARY), entry("luong", Category.SALARY),
           entry("thu nhập", Category.OTHER_INCOME), entry("thu nhap", Category.OTHER_INCOME));
   private static final Pattern KNOWN_CUES = cues(PHRASES.keySet());
+  private static final Pattern UNSUPPORTED_FINANCE = cues(Set.of(
+      "hoàn tiền", "hoan tien", "chuyển khoản", "chuyen khoan", "chuyển tiền",
+      "chuyen tien", "vay", "nợ", "no", "trả nợ", "tra no"));
+
+  public static boolean isUnsupportedFinance(String text) {
+    return UNSUPPORTED_FINANCE.matcher(text.toLowerCase(Locale.ROOT)).find();
+  }
+
   private static final Pattern UNSUPPORTED_CUES =
       cues(Set.of(
-          "hoàn tiền", "hoan tien", "chuyển khoản", "chuyen khoan", "chuyển tiền",
-          "chuyen tien", "vay", "nợ", "no", "trả nợ", "tra no", "hôm qua", "hom qua",
+          "hôm qua", "hom qua",
           "hôm kia", "hom kia", "hôm nay", "hom nay", "ngày mai", "ngay mai"));
   private static final Pattern WHITESPACE = Pattern.compile("[\\s\\p{Z}]+");
   private static final Pattern GROUPED_AMOUNT = Pattern.compile("^[0-9]+(?: [0-9]{3})+(?: |$)");
@@ -83,10 +97,10 @@ public final class TransactionInterpreter implements InputInterpreter {
       return problem(NEEDS_CLARIFICATION, MISSING_AMOUNT, "amountMinor");
     }
     String lower = text.toLowerCase(Locale.ROOT);
-    if (RangeQueryInterpreter.isQuery(text)) {
-      return RangeQueryInterpreter.clarify();
+    if (isQuery(text)) {
+      return problem(NEEDS_CLARIFICATION, Code.QUERY_CLARIFICATION, "text");
     }
-    if (text.startsWith("/") || UNSUPPORTED_CUES.matcher(lower).find()) {
+    if (text.startsWith("/") || isUnsupportedFinance(lower) || UNSUPPORTED_CUES.matcher(lower).find()) {
       return problem(UNSUPPORTED, UNSUPPORTED_INPUT, "text");
     }
     if (text.codePoints().anyMatch(TransactionInterpreter::isLookalikeSign)) {

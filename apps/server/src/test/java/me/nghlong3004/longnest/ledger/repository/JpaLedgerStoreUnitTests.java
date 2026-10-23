@@ -82,6 +82,12 @@ class JpaLedgerStoreUnitTests {
     var result = store.totals("personal", range, RangeFilter.ALL);
     assertThat(result.incomeCount().toString()).isEqualTo("9223372036854775808");
     assertThat(result.net().toString()).isEqualTo("92233720368547758079999");
+    when(entries.totals("personal", range.from(), range.to(), "FOOD")).thenReturn(projection);
+    when(projection.getIncomeTotal()).thenReturn(BigDecimal.ZERO);
+    when(projection.getIncomeCount()).thenReturn(BigDecimal.ZERO);
+    assertThat(store.totals("personal", range, RangeFilter.FOOD).net().toString())
+        .isEqualTo("-1");
+    verify(entries).totals("personal", range.from(), range.to(), "FOOD");
     when(projection.getIncomeTotal()).thenReturn(new BigDecimal("1.5"));
     assertThatThrownBy(() -> store.totals("personal", range, RangeFilter.ALL))
         .isInstanceOf(ArithmeticException.class);
@@ -96,12 +102,28 @@ class JpaLedgerStoreUnitTests {
         Optional.of(new LedgerCursors.Key(null, 42, range.to())))).isEmpty();
     verify(entries).range("personal", range.from(), range.to(), "EXPENSE", range.to(), 42,
         PageRequest.of(0, 11));
+    assertThat(store.range("personal", range, RangeFilter.FOOD,
+        Optional.of(new LedgerCursors.Key(null, 42, range.to())))).isEmpty();
+    verify(entries).range("personal", range.from(), range.to(), "FOOD", range.to(), 42,
+        PageRequest.of(0, 11));
     // Simple-name collision with jakarta.persistence.Query used for the EntityManager fixtures.
     var query = EntryRepository.class.getMethod("totals", String.class, LocalDate.class,
         LocalDate.class, String.class).getAnnotation(org.springframework.data.jpa.repository.Query.class);
     assertThat(query.nativeQuery()).isTrue();
     assertThat(query.value()).contains("sum(amount_minor)", "as numeric", "deleted = false",
         "transaction_date between :fromDate and :toDate", "owner_id = :owner");
+    assertThat(query.value()).contains(
+        ":typeFilter = 'FOOD' and transaction_type = 'EXPENSE' and category = 'FOOD'");
+    var pageQuery = EntryRepository.class.getMethod("range", String.class, LocalDate.class,
+        LocalDate.class, String.class, LocalDate.class, long.class,
+        org.springframework.data.domain.Pageable.class)
+        .getAnnotation(org.springframework.data.jpa.repository.Query.class);
+    assertThat(pageQuery.nativeQuery()).isFalse();
+    assertThat(pageQuery.value()).contains("e.owner = :owner", "e.deleted = false",
+        "e.values.transactionDate between :fromDate and :toDate",
+        ":typeFilter = 'FOOD' and cast(e.values.type as string) = 'EXPENSE'",
+        "cast(e.values.category as string) = 'FOOD'",
+        "order by e.values.transactionDate desc, e.id desc");
   }
 
   @Test

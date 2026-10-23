@@ -7,6 +7,170 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### NATIVE-AI-1 — ACCEPT native conversation, synthetic/local only
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns the stable integrated candidate,
+shared docs and final handoff. Predecessor `8442a05c-6421-45c4-adc7-65b64111c30f`
+had no active turn and was archived before transfer; no old writer was restarted.
+Base `0d76abf9d42163454b95411e8f8463389ad9ba7e`; prior status-only handoff checkpoint
+`b100fbeadbe282b6cfc392c8686bab3a415f2c33`. No unrelated/private changes taken.
+
+Outcome: default-off Spring AI 2.0.1 ChatClient, native @Tool callbacks and controlled
+ToolCallingManager execution, bounded Spring MessageWindowChatMemory, grounded
+Vietnam dates and isolated follow-ups. Existing deterministic clear capture,
+commands/field prompts/controls, services, exact money, auth, revisions, replay and
+actual-user Save/Delete/Cancel proof remain. Superseded bespoke JSON interpreters,
+protocol results and fixtures are removed, not retained as unused fallback layers.
+No POM/dependency/schema change, generic agent framework or persistence layer.
+
+Settled meanings: THIS_MONTH is first day through the frozen host business date
+(month-to-date, no later dates); LAST_MONTH is the whole previous calendar month.
+FOOD is exactly active EXPENSE + Category.FOOD, not groceries or note search.
+Follow-ups retain validated dimensions unless explicitly changed. No usable scope
+means clarification. Natural reads reuse exact full-range summaries/pages and
+existing current-entry/Edit/Delete navigation, without ledger-result/model egress.
+Capture creates immediately when clear; tools only preview Edit/request Delete.
+Restore is the existing authorized replay-safe mutation. Model Save/Confirm/Cancel,
+proof/actor/operation-ID/SQL inputs and multi-callback execution are absent.
+
+Ownership/dispositions:
+
+- FOOD-QUERY-1 Peer `00acd16e-22cc-440d-82ed-79ffc04f6145` submitted/released nine
+  paths, aggregate `7db1f8f904a21e0756672f34bddff9ce5fadee4366ed896ab7903925a6b589ff`.
+  ACCEPT unchanged hashes: shared FOOD filtering/totals/pages/cursors and integrated
+  tests pass. PostgreSQL execution remains unverified. No Peer writes reopened.
+- NATIVE-AI-TEST-1 continued as Peer `0e88f928-28ce-4ddb-bd9a-131eeef79086` after
+  failed predecessor was archived; explicit two-test-file assignment and current
+  callback restored. Submitted/released `c3b47e6f1cb3f7186dc3147d34bc5b243f18a641c9cfbbb25f1e572a34035126`
+  was REJECTED as complete: actual SDK fixture missing, fake options unstubbed.
+  Lead explicitly took repair scope; retained memory tests, corrected configuration
+  fixture and added actual in-process SDK/native request check. Peer acknowledged
+  stopped writes/builds; repaired tests are part of the accepted Lead candidate.
+- Fresh read-only Peer `43125d4d-8647-4424-bff7-72911d50085c` inspected exact 107-file
+  snapshot `fb9d8fd5ebf8af6264d07ae9ca325630d45284d83b89aac1cb94a6a2532d7814`.
+  Profile slp-peer/gpt-6.1-sol/medium selected after profile inspection; read-only
+  runtime mode unavailable, so auto mode plus explicit no-write assignment used.
+  Peer matched all hashes, found no proof/multi-call/result-egress bypass, and
+  reported two P2 defects: canceled-before-start model task wedges busy state;
+  explicit KEEP+FOOD after INCOME incorrectly clarifies. Lead accepted findings,
+  REJECTED that snapshot for final acceptance and owned both repairs/tests.
+  Peer acknowledged complete/no ownership. No review writer exists.
+
+Final Lead disposition: ACCEPT exact **107-file server manifest**
+`b698106aa4800cf4fed7c5940d3296f70fbe77b4d6009e15d7759d1ec7a436de`.
+Manifest/archive: `/tmp/longnest-native-ai.HBq4sb/candidate-server-final.sha256`
+and `candidate-server-final.tar.gz`, archive SHA-256
+`8b2afcbefe9fe2d372c19631ab2dff3b8138505dd9ffaae737f405fd9609b1e1`.
+All implementation/build writers stopped and source hashes reproduced. The two
+repair regressions pass: queued cancellation frees the guard without allowing a
+late callback, and explicit FOOD scope retains prior income dates correctly.
+Acceptance applies to this repaired candidate, not the reviewed predecessor.
+
+Verification: Temurin Java25.0.4.1/Maven3.10.0/Linux WSL2, isolated empty environment,
+empty user/global Maven settings, offline existing cache. Final package **526 tests,
+zero failures/errors/skips**. Earlier complete package/fresh-class runs passed524
+before the two repair tests. Final standalone smoke passes non-web managed virtual
+thread execution and context closure. Logs `apps/server/target/native-package-repaired.log`
+and `native-smoke-final.log`; fresh-class evidence `native-package-fresh.log`.
+Reproduce via server README build/smoke commands, using the existing cache and empty
+settings `/tmp/longnest-nl-query-lead.1eG5tB/settings.xml` for both -s and -gs.
+No provider/socket/DB/Telegram/container/private-env/paid/deployment action occurred.
+
+Checks cover actual ChatClient/memory/native-manager routing and SDK request shape,
+non-thinking/512-token cap/eight native tools/one request/no second narration;
+relative-date/FOOD follow-ups and ordinary reply-to pages; full-range totals, paging
+and current record controls; strict schema/unknown/duplicate/multi-call rejection;
+literal amount/currency/known unsupported finance; authorization/target/replay and
+storage-failure handling; bounded/reset/expiry memory, quota, concurrency and both
+running/queued cancellation. Real language correctness is not tested by fake models.
+JAR includes native conversation/generated mapper and excludes old interpreters,
+smoke launcher/YAML. Static checks: local Markdown targets/fences, 107 unique
+Vietnamese resource keys, changed-file whitespace. No formatter installation.
+Existing Mockito/Lombok/Unsafe warnings and deprecated pinned tool-callback API
+warnings remain nonfatal; no compatibility with a future Spring AI version claimed.
+
+Failed/unknown checks preserved separately: initial test compilation/stubbing,
+paging-fixture and known-flow case-matching failures were corrected; intermediate
+logs remain under `/tmp/longnest-native-ai.HBq4sb`. Offline clean goal failed before
+execution because clean plugin is uncached. Cross-filesystem generated-output move
+hit full /tmp, so that attempted check is not accepted evidence. Partial generated
+copy was recovered to ignored `apps/server/target/native-recovery-copy`, and prior
+classes kept in `native-build-before`; no source/private data deleted. Later
+fresh-output compilation/package and final repaired package passed without downloads.
+
+Usable downstream input: this native candidate and synthetic fixtures, with existing
+activation names/default-off behavior; see [server README](../apps/server/README.md#opt-in-deepseek-conversation).
+Memory is eight user utterances, sixteen contexts, ten-minute idle expiry/reset and
+no restart persistence; historical utterances would be egress when enabled. One
+active request, 60 attempts per process-local hour, one attempt and 2/8/10-second
+deadlines bound workload, not spend. No persistent quota/token-cost accounting.
+No exactly-once reply/charge, general intent/injection guarantee, fuzzy selection or
+unsupported category/note search. Model can still be semantically wrong despite
+valid structure; live evaluation remains required before activation.
+
+Remaining frontier: Human/operator owns endpoint/model choice, permitted utterance/
+history privacy/terms/region/retention, credential custody and monetary caps before
+live evaluation/activation. PostgreSQL provisioning/init/durability and live Telegram
+scope/evidence remain outstanding, not waived by code acceptance. No deployment,
+push or remote/destination guess. Existing configured identity/main/no remote or
+upstream verified for the local commit. No other code assignment is left active.
+
+Complete change set (A added, M modified, D removed):
+
+```text
+M	AGENTS.md
+M	apps/server/README.md
+A	apps/server/src/main/java/me/nghlong3004/longnest/conversation/ConversationAssistant.java
+A	apps/server/src/main/java/me/nghlong3004/longnest/conversation/ConversationConfiguration.java
+A	apps/server/src/main/java/me/nghlong3004/longnest/conversation/ConversationMemory.java
+A	apps/server/src/main/java/me/nghlong3004/longnest/conversation/LedgerTools.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/domain/RangeFilter.java
+D	apps/server/src/main/java/me/nghlong3004/longnest/input/DeepSeekInterpreter.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/input/InputConfiguration.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/input/InputInterpreter.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/input/InterpretationResult.java
+D	apps/server/src/main/java/me/nghlong3004/longnest/input/RangeQueryInterpreter.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/input/TransactionInterpreter.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/adapter/LedgerClient.java
+A	apps/server/src/main/java/me/nghlong3004/longnest/ledger/dto/OperationRecovery.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/dto/RangeSummary.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/mapper/TransactionMapper.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/repository/EntryRepository.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/impl/LedgerQueryServiceImpl.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/impl/TransactionServiceImpl.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/LedgerQueryService.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/TransactionService.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/telegram/adapter/TelegramCapture.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/telegram/config/TelegramConfiguration.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/telegram/mapper/TelegramReplies.java
+M	apps/server/src/main/java/me/nghlong3004/longnest/telegram/model/TelegramNavigation.java
+M	apps/server/src/main/resources/application.yaml
+M	apps/server/src/main/resources/messages_vi.properties
+A	apps/server/src/test/java/me/nghlong3004/longnest/conversation/ConversationAssistantTests.java
+A	apps/server/src/test/java/me/nghlong3004/longnest/conversation/ConversationConfigurationTests.java
+A	apps/server/src/test/java/me/nghlong3004/longnest/conversation/ConversationMemoryTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/domain/DomainValuesTests.java
+D	apps/server/src/test/java/me/nghlong3004/longnest/input/DeepSeekInterpreterTests.java
+D	apps/server/src/test/java/me/nghlong3004/longnest/input/InputConfigurationTests.java
+D	apps/server/src/test/java/me/nghlong3004/longnest/input/RangeQueryInterpreterTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/ledger/pagination/LedgerCursorsTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/ledger/repository/JpaLedgerStoreUnitTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/ledger/service/LedgerControlsTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/ledger/service/LedgerRangeTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/presentation/UiMessagesTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/telegram/config/TelegramLifecycleTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/telegram/TelegramAdapterTests.java
+M	apps/server/src/test/java/me/nghlong3004/longnest/telegram/TelegramRangeTests.java
+M	docs/ARCHITECTURE.md
+M	docs/DECISIONS.md
+M	docs/DOMAIN.md
+M	docs/features/adapters/README.md
+M	docs/PRODUCT.md
+M	docs/SERVICES.md
+M	docs/WORK_STATUS.md
+M	README.md
+```
+
 ### NL-QUERY-1 — ACCEPT explicit-date conversational reads, synthetic/local only
 
 Base: accepted commit `1767ce779d3a84bd4fe1b56617de797fc199a47c`, 102-file server

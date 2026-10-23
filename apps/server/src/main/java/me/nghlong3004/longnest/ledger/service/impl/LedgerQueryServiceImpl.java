@@ -88,7 +88,7 @@ public class LedgerQueryServiceImpl implements LedgerQueryService {
     var found = store.range(principal, range, filter, before);
     if (found.size() > 11 || found.stream().anyMatch(entry ->
         !principal.equals(entry.owner()) || entry.deleted()
-            || !filter.includes(entry.intent().draft().type())
+            || !filter.includes(entry.intent().draft().type(), entry.intent().draft().category())
             || entry.intent().transactionDate().isBefore(range.from())
             || entry.intent().transactionDate().isAfter(range.to()))) {
       throw new LedgerException(LedgerException.Code.NOT_SAVED);

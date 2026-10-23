@@ -27,6 +27,7 @@ import me.nghlong3004.longnest.domain.Money;
 import me.nghlong3004.longnest.domain.Note;
 import me.nghlong3004.longnest.domain.TransactionDraft;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
+import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
 import me.nghlong3004.longnest.ledger.dto.ControlBinding;
 import me.nghlong3004.longnest.ledger.dto.FieldPrompt;
@@ -109,6 +110,19 @@ public class TransactionMapper {
 
   public TransactionInput input(TransactionDraft draft) {
     return representations.input(Objects.requireNonNull(draft));
+  }
+
+  public TransactionInput input(TransactionDraft draft, LocalDate date) {
+    return new TransactionInput(draft.type(), draft.amount().canonicalAmount(), Money.CURRENCY,
+        Optional.of(date.toString()), Optional.of(draft.category()), Optional.of(draft.note().value()));
+  }
+
+  public OperationRecovery recovered(MutationReceipt receipt) {
+    return new OperationRecovery(receipt, null);
+  }
+
+  public OperationRecovery recovered(ConfirmationRequired preview) {
+    return new OperationRecovery(null, preview);
   }
 
   /** Applies a sparse patch to a frozen snapshot; no identity/timestamp field is editable. */

@@ -3,6 +3,7 @@ package me.nghlong3004.longnest.ledger.service;
 import java.util.List;
 import java.util.Optional;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
+import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
 import me.nghlong3004.longnest.ledger.dto.ControlBinding;
 import me.nghlong3004.longnest.ledger.dto.FieldPrompt;
@@ -14,6 +15,15 @@ import me.nghlong3004.longnest.ledger.model.HostContext;
 import me.nghlong3004.longnest.ledger.model.LedgerException;
 
 public interface TransactionService {
+  /**
+   * Recovers a frozen conversational event before nondeterministic interpretation.
+   *
+   * @param context authenticated original host event and interaction scope
+   * @return original create/Restore receipt or update/delete preview, absent only for unknown events
+   * @throws LedgerException for unauthorized, conflicting, unavailable or invalid stored state
+   */
+  Optional<OperationRecovery> recoverOperation(HostContext context);
+
   /**
    * Initializes the sole owner head only in empty, durable storage; operator use only.
    *

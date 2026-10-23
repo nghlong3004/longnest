@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.List;
 import java.time.Clock;
+import me.nghlong3004.longnest.conversation.ConversationAssistant;
 import me.nghlong3004.longnest.input.TransactionInterpreter;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
@@ -30,6 +31,7 @@ import me.nghlong3004.longnest.telegram.model.TelegramSettings;
 import okhttp3.OkHttpClient;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.runner.ApplicationContextRunner;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import org.springframework.test.util.ReflectionTestUtils;
 import org.telegram.telegrambots.longpolling.BotSession;
@@ -54,7 +56,8 @@ class TelegramLifecycleTests {
       var lifecycle = new TelegramConfiguration().telegramLifecycle(settings,
           new PersonalOwner("personal"), mock(TransactionMapper.class), mock(LedgerClient.class),
           Clock.systemUTC(), mock(UiMessages.class), new ControlProofs(),
-          new TransactionInterpreter(), executor);
+          new TransactionInterpreter(), new DefaultListableBeanFactory()
+              .getBeanProvider(ConversationAssistant.class), executor);
       try {
         var http = (OkHttpClient) ReflectionTestUtils.getField(lifecycle, "http");
         assertThat(http.connectTimeoutMillis()).isEqualTo(5000);

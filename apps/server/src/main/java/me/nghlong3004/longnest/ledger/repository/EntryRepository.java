@@ -30,7 +30,8 @@ public interface EntryRepository extends JpaRepository<LedgerEntry, Long> {
       cast(count(*) filter (where transaction_type = 'EXPENSE') as numeric) as "expenseCount"
       from ledger_entry where owner_id = :owner and deleted = false
       and transaction_date between :fromDate and :toDate
-      and (:typeFilter = 'ALL' or transaction_type = :typeFilter)
+      and (:typeFilter = 'ALL' or transaction_type = :typeFilter
+        or (:typeFilter = 'FOOD' and transaction_type = 'EXPENSE' and category = 'FOOD'))
       """, nativeQuery = true)
   TotalsProjection totals(@Param("owner") String owner, @Param("fromDate") LocalDate from,
       @Param("toDate") LocalDate to, @Param("typeFilter") String filter);
@@ -38,7 +39,9 @@ public interface EntryRepository extends JpaRepository<LedgerEntry, Long> {
   @Query("""
       select e from LedgerEntry e where e.owner = :owner and e.deleted = false
       and e.values.transactionDate between :fromDate and :toDate
-      and (:typeFilter = 'ALL' or cast(e.values.type as string) = :typeFilter)
+      and (:typeFilter = 'ALL' or cast(e.values.type as string) = :typeFilter
+        or (:typeFilter = 'FOOD' and cast(e.values.type as string) = 'EXPENSE'
+          and cast(e.values.category as string) = 'FOOD'))
       and (:beforeDate is null or e.values.transactionDate < :beforeDate
         or (e.values.transactionDate = :beforeDate and e.id < :beforeId))
       order by e.values.transactionDate desc, e.id desc

@@ -1,92 +1,42 @@
 # Later adapters — A1 LLM and A2 web
 
-A1 has bounded capture and explicit-date read-intent implementations; broader A1/A2 remain later scope, not
+A1 has a bounded default-off native conversation implementation; broader A1/A2 remain later scope, not
 prerequisites for current CRUD, daily budget or salary advice.
 [Services](../../SERVICES.md) owns typed capabilities/tool mappings;
 [Domain](../../DOMAIN.md#input-to-normalized-contract) owns the normalized boundary;
 [C4](../../ARCHITECTURE.md) owns architecture. Do not copy financial rules here.
-DS-FALLBACK-1 and NL-QUERY-1 implement bounded A1 subsets under CURRENT STATUS;
-no Peer is assigned. A2 and a general model tool/intent dispatcher do not exist.
+NATIVE-AI-1 supersedes DS-FALLBACK-1/NL-QUERY-1 under CURRENT STATUS.
+A2 and an unbounded general agent/tool loop do not exist.
 
 The deterministic ledger's L1–L3 code now has bounded synthetic/local acceptance;
 see CURRENT STATUS for exact artifacts and the remaining PostgreSQL/live evidence.
 The shared create/get/recent/edit-preview/Save/Delete/Restore and range boundaries
 are implemented inputs for later adapter work, not permission to activate a model.
-Rules-first DeepSeek fallback is selected; live endpoint/model/privacy/cost remain
+Native Spring AI conversation is selected; live endpoint/model/privacy/cost remain
 specific unresolved decisions; settled money/date/auth/confirmation behavior
 is not reopened. No model may manufacture the host-only Save/Delete/Cancel proof.
 
-## A1 — future LLM interpretation through accepted capabilities
+## A1 — native conversation through accepted capabilities
 
-Current bounded implementation uses existing Spring AI DeepSeek 2.0.1, not a
-handwritten provider HTTP client, and is disabled by default. Only safe
-UNKNOWN_PHRASE capture can be interpreted; money/source/type evidence and the same
-rules validate the JSON result. Frozen create recovery precedes another provider
-attempt. No natural-language date/query/edit/delete dispatcher or model tools are
-installed by DS-FALLBACK-1. NL-QUERY-1 adds only LIST_RANGE | CLARIFY for explicit
-ISO endpoints and income/expense/all scope, through the same default-off binding.
-The host calls existing query services and renders exact totals/pages/current
-selection directly; no ledger results return to the model and no native tools or
-multi-call loop exists. Recognized questions cannot fall into capture. Relative
-dates, follow-up context and natural-language actions remain absent.
-See [server configuration/limits](../../../apps/server/README.md#opt-in-deepseek-capture-fallback).
-Proposals below describe broader A1, not claims those capabilities now exist.
+NATIVE-AI-1 replaces historical capture/explicit-date JSON interpretation with existing
+Spring AI 2.0.1 ChatClient, native @Tool/ToolCallingManager and bounded Spring memory.
+Default remains off. [Services](../../SERVICES.md#native-conversational-interpretation)
+owns grounding, identity/context, native capability and recovery contracts;
+[server configuration](../../../apps/server/README.md#opt-in-deepseek-conversation)
+owns activation, usage examples and concrete limits. No separate LifeOS runtime,
+agent platform, provider HTTP codec or parallel legacy interpreter remains.
 
-**Outcome/examples:** user supplies complete phrasing outside current grammar; a
-future authorized interpreter proposes the same typed request and presents the
-service result. Missing amount/type clarifies. Given host business date 2026-10-20,
-`hôm qua` can mean 2026-10-19 in Asia/Ho_Chi_Minh; today's parser is not changed.
-Delete remains request → displayed target → actual user proof → host-only commit.
+The useful path is grounded Vietnamese query → authoritative full-range summary/
+selectable page → follow-up period/FOOD scope → current selected record/standard
+controls. Month-to-date and FOOD-only semantics are settled. Native creates retain
+immediate save for clear intent; edits produce preview, Delete requests confirmation,
+Restore uses the normal authorized mutation. Save/Confirm/Cancel are never model
+capabilities. Service results are rendered directly, not sent back to the model.
 
-**Required inputs:** exact accepted L1–L3/services candidate plus Human approval for
-provider, cost and privacy/external transmission before live execution. Rules-first
-fallback is selected for the bounded implementation; replacement is not selected.
-Budget/allocation tools may be exposed only after their own service is accepted.
-
-**Provisional scope:** bounded interpreter/tool adapter, routing and contract tests,
-not an agent platform or core-finance rewrite. Lead owns shared schema/service
-changes. No owner, provider credentials or execution authority is assigned now.
-
-**Evidence:** R18–R19 below; direct-service parity, hostile/unknown fields, no actor/
-confirmation spoofing, truthful saved outcomes and missing-fact behavior. Unresolved
-mutation ambiguity never executes. Material decisions are provider/privacy/cost and
-strategy; no such decision authorizes money movement or direct persistence.
-
-### Candidate and minimal OOP path — proposals
-
-DeepSeek is selected for implementation, not approved live execution or egress.
-See [source-backed LifeOS/DeepSeek findings](../../research/LIFEOS.md).
-Reuse LifeOS routing, bounded-result and egress-policy concepts, not its runtime,
-hooks, memory, CLI subprocess or provider trust rules. No separate agent platform.
-
-In the existing Spring Boot/Java 25 application, propose one InputInterpreter
-contract with RulesInterpreter and a future DeepSeekInterpreter; one small provider
-HTTP codec/client belongs inside that adapter. An allowlisted dispatcher maps its
-typed requests to the existing [service matrix](../../SERVICES.md#telegram--application--future-llm-capability-matrix).
-These are responsibilities, not a requirement for one new class per label/tool.
-Host context supplies principal, business time and operation identity outside model
-arguments. Full response/schema validation precedes dispatch; services revalidate
-Money/date/range, authorization, target/revision, idempotency and durable consistency.
-Delete confirmation stays host-only from the actual user's displayed-target action.
-Selected PE1 requires host Save of an immutable update preview too. Calculations,
-budget and allocation arithmetic stay deterministic; no repository/SQL model tool.
-
-Recommend rules-first fallback initially: clear supported text stays local; genuine
-missing facts clarify locally; only unsupported/uncertain complete phrasing goes
-to an approved future provider. Known invalid business values are not “repaired”
-by a model. Interpreter replacement remains an alternative using identical typed
-contracts, tools and safeguards; it changes text routing/egress/latency/coverage,
-not financial logic. Buttons and explicit query/delete confirmations still route
-directly. Bounded capture fallback is implemented; replacement is not.
-
-Minimize egress to the relevant utterance/business reference and necessary selected
-record fields, not the ledger/history. Propose one completed interpretation and at
-most one mutation request per utterance; reject surplus/parallel mutations before
-executing any. Queries can be bounded/sequenced by the host. Render the authoritative
-service receipt directly; provider narration is not proof of a saved transaction.
-No new blanket confirmation is added to approved clear creation. Language coverage
-and wrong-but-schema-valid interpretations require the evaluation below, not trust
-in a strict schema or model confidence.
+User/history data would be egress if enabled. Local/fake-model tests cannot establish
+Vietnamese quality, arbitrary prompt-injection resistance, PostgreSQL durability or
+live Telegram UX. Endpoint/model, permitted history, privacy/terms, credentials and
+monetary limits remain separate live decisions. No provider call is authorized.
 
 ### Smallest future evaluation — synthetic, mock-only effects
 

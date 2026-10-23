@@ -14,11 +14,12 @@ OOP use cases and future tools; Telegram is an adapter, not the business layer.
 
 ## Selected first-release grammar
 
-The grammar below is asserted transaction capture, not questions. Recognized
-read-request cues/question marks now route to clarification or the default-off
-NL-QUERY-1 interpreter before capture. Its separate LIST_RANGE intent requires
-two explicit ordered ISO endpoints and income/expense/all source evidence;
-relative dates/context and arbitrary query filters are not inferred. See
+The grammar below is local asserted capture, not questions. Recognized read cues
+route to clarification or default-off native conversation before capture.
+NATIVE-AI-1 supersedes NL-QUERY-1's ISO-only source gate with trusted Vietnam-relative
+periods or explicit validated dates and bounded follow-ups. THIS_MONTH means
+month-to-date; FOOD means exactly EXPENSE + Category.FOOD. Unsupported filters or
+missing usable context clarify. See
 [adapter boundary](features/adapters/README.md) and CURRENT STATUS. This guard does
 not prohibit punctuation in structured Note edits or typed transaction inputs;
 authenticated field prompts retain their explicit edit → Save semantics.
@@ -117,9 +118,9 @@ extend this table and the [acceptance examples](features/ledger/ACCEPTANCE.md), 
   Current rules flag relative-date cues `hôm qua`/`hom qua`, `hôm kia`/`hom kia`,
   `hôm nay`/`hom nay`, `ngày mai`/`ngay mai` at word boundaries, including in signed
   descriptions, as unsupported language, not invalid Money/DateRange values. Future
-  fallback may interpret these; no current LLM call occurs. Unlisted temporal
-  language is never interpreted as a date;
-  this small vocabulary is not a general date recognizer.
+  native interpretation can resolve supported periods when explicitly enabled;
+  default rules do not infer dates. This small deterministic vocabulary is not a
+  general date recognizer; model interpretation accuracy remains unverified.
 - Summaries show income, expense and net flow, not a claimed bank balance. No
   opening balance or account-transfer model exists in this design.
 
@@ -170,7 +171,8 @@ examples use the approved immediate-save path after authorization and validation
 
 Approved behavior: a fully valid, authorized, unambiguous entry creates
 a transaction immediately and receives its complete receipt/ID. Missing or ambiguous
-input never writes; ask for a complete resubmission instead of unbounded chat context.
+input never writes; default rules ask for complete resubmission. Opt-in conversation
+may use bounded history/validated query scope, never unbounded context or proof.
 Do not add mandatory preview to clear creations or execute an unresolved ambiguous
 mutation. A future interpreter uses the same application policy; model confidence
 does not resolve missing facts or authorize an action that the user did not request.
@@ -281,8 +283,8 @@ details and the capability matrix; do not duplicate business validation in parse
 Reason codes distinguish parser coverage (`UNSUPPORTED_INPUT`, `UNKNOWN_PHRASE`)
 from genuinely absent/conflicting facts (`MISSING_AMOUNT`, `MISSING_TYPE`,
 `CONFLICTING_TYPE`, `AMBIGUOUS_AMOUNT`) and invalid values/operations. Unsupported
-input in today's rules asks for supported wording or explicit fields; no LLM call
-occurs. A future fallback may resolve coverage uncertainty, not invent missing facts.
+input in default rules asks for supported wording or explicit fields. Opt-in native
+conversation may resolve coverage gaps, not invent missing facts.
 
 All adapters/tools pass through application authorization and the same Money,
 date/range, category, revision, action-proof, idempotency and persistence checks.
@@ -291,11 +293,10 @@ chat IDs or model sessions. Queries do not write. A future model may request
 deletion but only the host's authenticated human action can confirm the displayed
 target; an LLM's `confirmed: true` is not an accepted field or proof.
 
-Two future strategies are supported in [Services](SERVICES.md#future-interpretation-strategies):
-rules first with LLM fallback, or LLM replacing the interpreter. Both emit this same
-typed boundary and call the same use cases. Future `hôm qua` interpretation uses
-the supplied business reference and timezone; the current grammar above remains
-unchanged. No LLM execution, provider/cost commitment, tool SDK or external
+The selected [native route](SERVICES.md#native-conversational-interpretation) keeps
+clear local capture and replaces bespoke LLM interpretation with bounded tools.
+Relative dates use the host business reference/timezone; deterministic grammar
+remains unchanged. No live LLM execution, provider/cost commitment or external
 transmission of financial data is authorized now.
 
 ## Future finance domain contracts

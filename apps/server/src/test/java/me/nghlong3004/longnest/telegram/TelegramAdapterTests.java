@@ -28,13 +28,16 @@ import me.nghlong3004.longnest.domain.Category;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.TransactionInterpreter;
 import me.nghlong3004.longnest.input.InputInterpreter;
-import me.nghlong3004.longnest.input.DeepSeekInterpreter;
+import me.nghlong3004.longnest.conversation.ConversationAssistant;
+import me.nghlong3004.longnest.conversation.LedgerTools;
+import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.metadata.ChatGenerationMetadata;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import tools.jackson.databind.json.JsonMapper;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
@@ -116,21 +119,28 @@ class TelegramAdapterTests {
   @Test
   void fallbackReplyFailureRecoversOriginalWithoutSecondModelOrMutation() throws Exception {
     var provider = mock(ChatModel.class);
+    when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());
     when(provider.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(
-        new AssistantMessage("""
-            {"status":"CREATE","canonicalText":"-45000 bữa trưa",
-             "amountEvidence":"45 nghìn","typeEvidence":"trả"}
-            """), ChatGenerationMetadata.builder().finishReason("stop").build()))));
+        AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+            "call-1", "function", "create_transaction", """
+            {"type":"EXPENSE","amount":"45 nghìn","currency":"VND",
+             "category":"UNCATEGORIZED","note":"bữa trưa","period":"TODAY"}
+            """))).build(), ChatGenerationMetadata.builder().finishReason("tool_calls").build()))));
     try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
-      var interpreter = new DeepSeekInterpreter(new TransactionInterpreter(), provider,
-          JsonMapper.builder().build(), executor);
-      var capture = capture(interpreter);
+      var capture = capture();
+      try (var validators = Validation.buildDefaultValidatorFactory()) {
+        var mapper = new TransactionMapper(validators.getValidator(),
+            Mappers.getMapper(TransactionRepresentationMapper.class));
+        capture.setConversation(new ConversationAssistant(provider, new PersonalOwner("personal"),
+            ledger, Clock.fixed(SOURCE, ZoneOffset.UTC), executor,
+            new LedgerTools(ledger, mapper), JsonMapper.builder().build()));
+      }
       var host = new HostContext("personal", "tg:123:9", SOURCE, SOURCE);
       var input = new TransactionInput(TransactionType.EXPENSE, "45000", "VND",
-          Optional.empty(), Optional.of(Category.UNCATEGORIZED), Optional.of("bữa trưa"));
-      when(ledger.recoverCreateIfPresent(any())).thenReturn(
+          Optional.of("2026-10-20"), Optional.of(Category.UNCATEGORIZED), Optional.of("bữa trưa"));
+      when(ledger.recoverOperation(any())).thenReturn(
           new LedgerResult.Ok<>(Optional.empty()),
-          new LedgerResult.Ok<>(Optional.of(receipt(host, input, true))));
+          new LedgerResult.Ok<>(Optional.of(new OperationRecovery(receipt(host, input, true), null))));
       when(ledger.create(any(), any())).thenReturn(new LedgerResult.Ok<>(receipt(host, input, false)));
       var attempts = new AtomicInteger();
       when(client.execute(any(SendMessage.class))).thenAnswer(call -> {
@@ -145,24 +155,32 @@ class TelegramAdapterTests {
       assertThat(capture.handle(event)).isTrue();
       verify(provider, times(1)).call(any(Prompt.class));
       verify(ledger, times(1)).create(any(), eq(input));
-      verify(ledger, times(2)).recoverCreateIfPresent(any());
+      verify(ledger, times(2)).recoverOperation(any());
     }
   }
 
   @Test
   void unavailableRecoveryStopsBeforeProviderAndUnauthorizedUserNeverInterprets() throws Exception {
-    var interpreter = mock(InputInterpreter.class);
-    when(interpreter.requiresRecovery(any())).thenReturn(true);
-    when(ledger.recoverCreateIfPresent(any())).thenReturn(new LedgerResult.Failure<>(
+    var provider = mock(ChatModel.class);
+    when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());
+    when(ledger.recoverOperation(any())).thenReturn(new LedgerResult.Failure<>(
         Code.OUTCOME_UNKNOWN, Optional.of("tg:123:9"), true));
-    var capture = capture(interpreter);
+    var capture = capture();
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory());
+        var validators = Validation.buildDefaultValidatorFactory()) {
+      var mapper = new TransactionMapper(validators.getValidator(),
+          Mappers.getMapper(TransactionRepresentationMapper.class));
+      capture.setConversation(new ConversationAssistant(provider, new PersonalOwner("personal"),
+          ledger, Clock.fixed(SOURCE, ZoneOffset.UTC), executor,
+          new LedgerTools(ledger, mapper), JsonMapper.builder().build()));
     capture.handle(update(9, "Mình vừa trả 45 nghìn cho bữa trưa."));
-    verify(interpreter, never()).interpret(any());
+    verifyNoInteractions(provider);
     verify(ledger, never()).create(any(), any());
     var foreign = update(10, "Mình vừa trả 45 nghìn cho bữa trưa.");
     foreign.getMessage().getFrom().setId(88L);
     capture.handle(foreign);
-    verify(interpreter, times(1)).requiresRecovery(any());
+    verify(ledger, times(1)).recoverOperation(any());
+    }
   }
 
   private static MutationReceipt receipt(HostContext host, TransactionInput input, boolean replay) {

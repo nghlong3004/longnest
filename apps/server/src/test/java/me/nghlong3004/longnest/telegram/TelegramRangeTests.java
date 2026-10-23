@@ -35,7 +35,8 @@ import me.nghlong3004.longnest.domain.TransactionDraft;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.TransactionInterpreter;
 import me.nghlong3004.longnest.input.InputInterpreter;
-import me.nghlong3004.longnest.input.DeepSeekInterpreter;
+import me.nghlong3004.longnest.conversation.ConversationAssistant;
+import me.nghlong3004.longnest.conversation.LedgerTools;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.dto.TransactionPage;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
@@ -68,6 +69,7 @@ import org.springframework.ai.chat.model.ChatModel;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
 import org.springframework.ai.chat.prompt.Prompt;
+import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.core.task.SimpleAsyncTaskExecutor;
 import tools.jackson.databind.json.JsonMapper;
 import org.telegram.telegrambots.meta.api.methods.AnswerCallbackQuery;
@@ -95,6 +97,7 @@ class TelegramRangeTests {
   private final TransactionMapper mapper = new TransactionMapper(VALIDATORS.getValidator(),
       Mappers.getMapper(TransactionRepresentationMapper.class));
   private TelegramCapture capture;
+  private LedgerClient ledger;
   private int event = 1;
 
   @AfterAll
@@ -104,7 +107,7 @@ class TelegramRangeTests {
     return rows.stream().filter(row -> !row.deleted() && row.owner().equals("personal")
         && !row.intent().transactionDate().isBefore(range.from())
         && !row.intent().transactionDate().isAfter(range.to())
-        && filter.includes(row.intent().draft().type()))
+        && filter.includes(row.intent().draft().type(), row.intent().draft().category()))
         .sorted(Comparator.comparing((Entry row) -> row.intent().transactionDate())
             .thenComparingLong(Entry::id).reversed()).toList();
   }
@@ -158,9 +161,10 @@ class TelegramRangeTests {
   private void restart(InputInterpreter interpreter) {
     var queries = new LedgerQueryServiceImpl(owner, store, mapper,
         new LedgerCursors(clock, new SecureRandom()));
+    ledger = new LedgerClient(owner, transactions, queries);
     capture = new TelegramCapture(client, new TelegramSettings("123:" + "x".repeat(30), 77),
         owner, interpreter, mapper,
-        new LedgerClient(owner, transactions, queries),
+        ledger,
         new TelegramReplies(UiMessagesTests.vietnamese()), clock,
         new TelegramNavigation(clock, new SecureRandom()), new ControlProofs());
   }
@@ -184,21 +188,19 @@ class TelegramRangeTests {
         .orElseThrow().getCallbackData();
   }
 
-  private DeepSeekInterpreter queryInterpreter(ChatModel provider, RangeFilter filter,
+  private void queryInterpreter(ChatModel provider, RangeFilter filter,
       SimpleAsyncTaskExecutor executor) {
-    String evidence = switch (filter) {
-      case INCOME -> "khoản thu";
-      case EXPENSE -> "khoản chi";
-      case ALL -> "giao dịch";
-    };
+    when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());
     String json = """
-        {"intent":"LIST_RANGE","from":"2026-10-01","to":"2026-10-31",
-         "filter":"%s","intentEvidence":"Cho tôi","filterEvidence":"%s"}
-        """.formatted(filter.name(), evidence);
+        {"period":"EXPLICIT","from":"2026-10-01","to":"2026-10-31","scope":"%s"}
+        """.formatted(filter.name());
     when(provider.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(
-        new AssistantMessage(json), ChatGenerationMetadata.builder().finishReason("stop").build()))));
-    return new DeepSeekInterpreter(new TransactionInterpreter(), provider,
-        JsonMapper.builder().build(), executor);
+        AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+            "call-1", "function", "list_transactions", json))).build(),
+        ChatGenerationMetadata.builder().finishReason("tool_calls").build()))));
+    when(transactions.recoverOperation(any())).thenReturn(Optional.empty());
+    capture.setConversation(new ConversationAssistant(provider, owner, ledger, clock, executor,
+        new LedgerTools(ledger, mapper), JsonMapper.builder().build()));
   }
 
   @ParameterizedTest
@@ -207,11 +209,12 @@ class TelegramRangeTests {
     RangeFilter filter = RangeFilter.valueOf(selected);
     var provider = mock(ChatModel.class);
     try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
-      restart(queryInterpreter(provider, filter, executor));
+      queryInterpreter(provider, filter, executor);
       String scope = switch (filter) {
         case INCOME -> "khoản thu";
         case EXPENSE -> "khoản chi";
         case ALL -> "giao dịch";
+        case FOOD -> "tiền ăn";
       };
       capture.handle(message("Cho tôi " + scope + " từ 2026-10-01 đến 2026-10-31."));
       assertThat(sends.getLast().getText()).contains("2026-10-01", "2026-10-31", "Asia/Ho_Chi_Minh");
@@ -221,12 +224,13 @@ class TelegramRangeTests {
         case EXPENSE -> assertThat(sends.getLast().getText()).contains("920000", "23 giao dịch", "#23")
             .doesNotContain("#100");
         case ALL -> assertThat(sends.getLast().getText()).contains("25000000", "920000", "24080000");
+        case FOOD -> throw new AssertionError("Not this fixture");
       }
       var expected = DateRange.parse("2026-10-01", "2026-10-31");
       verify(store).totals("personal", expected, filter);
       verify(store).range("personal", expected, filter, Optional.empty());
       verify(provider, times(1)).call(any(Prompt.class));
-      verifyNoInteractions(transactions);
+      verify(transactions).recoverOperation(any());
     }
   }
 
@@ -234,7 +238,7 @@ class TelegramRangeTests {
   void conversationalPageNavigatesAndSelectsCurrentRevisionWithExistingL2Controls() {
     var provider = mock(ChatModel.class);
     try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
-      restart(queryInterpreter(provider, RangeFilter.EXPENSE, executor));
+      queryInterpreter(provider, RangeFilter.EXPENSE, executor);
       capture.handle(message("Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-31."));
       capture.handle(callback(delivered.getLast(), button("Trang sau")));
       assertThat(sends.getLast().getText()).contains("#13", "920000").doesNotContain("#23");
@@ -250,23 +254,66 @@ class TelegramRangeTests {
       assertThat(button("Sửa")).startsWith("v:");
       assertThat(button("Xóa")).startsWith("v:");
       verify(provider, times(1)).call(any(Prompt.class));
-      verifyNoInteractions(transactions);
+      verify(transactions).recoverOperation(any());
     }
+  }
+
+  @Test
+  void groundedReadAndOrdinaryReplyFollowupsRenderFoodTotalsAndKeepNavigation() {
+    for (int index = 0; index < rows.size() - 1; index++) {
+      Entry old = rows.get(index);
+      rows.set(index, new Entry(old.owner(), old.id(), old.revision(), new CreateIntent(
+          new TransactionDraft(TransactionType.EXPENSE, new Money(40000),
+              index == 0 ? Category.GROCERIES : Category.FOOD, new Note("food")),
+          old.intent().transactionDate()), old.createdAt(), old.messageAt(), false));
+    }
+    var provider = mock(ChatModel.class);
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      queryInterpreter(provider, RangeFilter.EXPENSE, executor);
+      when(provider.call(any(Prompt.class))).thenReturn(
+          nativeQuery("YESTERDAY", "EXPENSE"), nativeQuery("THIS_MONTH", "KEEP"),
+          nativeQuery("KEEP", "FOOD"));
+      capture.handle(message("hôm qua anh chi bao nhiêu?"));
+      assertThat(sends.getLast().getText()).contains("2026-10-20", "920000", "23 giao dịch");
+      var followup = message("tháng này thì sao?");
+      followup.getMessage().setReplyToMessage(delivered.getLast());
+      capture.handle(followup);
+      assertThat(sends.getLast().getText()).contains("2026-10-01", "2026-10-21", "920000");
+      capture.handle(message("chỉ tiền ăn thôi"));
+      assertThat(sends.getLast().getText()).contains("ăn uống (FOOD)", "880000", "22 giao dịch");
+      capture.handle(callback(delivered.getLast(), button("Trang sau")));
+      assertThat(sends.getLast().getText()).contains("880000", "#13");
+      verify(provider, times(3)).call(any(Prompt.class));
+      verify(transactions, times(3)).recoverOperation(any());
+    }
+  }
+
+  private ChatResponse nativeQuery(String period, String scope) {
+    return new ChatResponse(List.of(new Generation(AssistantMessage.builder().content("")
+        .toolCalls(List.of(new AssistantMessage.ToolCall("query", "function", "list_transactions",
+            "{\"period\":\"" + period + "\",\"scope\":\"" + scope + "\"}"))).build(),
+        ChatGenerationMetadata.builder().finishReason("tool_calls").build())));
   }
 
   @Test
   void foreignQueryNeverCallsInterpreterAndMissingDatesDoNotReadOrWrite() {
     var provider = mock(ChatModel.class);
     try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
-      restart(queryInterpreter(provider, RangeFilter.EXPENSE, executor));
+      queryInterpreter(provider, RangeFilter.EXPENSE, executor);
       var foreign = message("Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-31.");
       foreign.getMessage().getFrom().setId(88L);
       capture.handle(foreign);
       assertThat(sends).isEmpty();
-      capture.handle(message("Cho tôi các khoản chi hôm qua"));
-      assertThat(sends.getLast().getText()).contains("hai ngày cụ thể", "YYYY-MM-DD")
+      when(provider.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(
+          AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+              "clarify-1", "function", "clarify", "{\"missing\":\"DATES\"}"))).build(),
+          ChatGenerationMetadata.builder().finishReason("tool_calls").build()))));
+      capture.handle(message("Cho tôi các khoản chi"));
+      assertThat(sends.getLast().getText()).contains("khoảng thời gian nào")
           .doesNotContain("Đã lưu", "Vui lòng gửi lại một giao dịch");
-      verifyNoInteractions(provider, transactions, store);
+      verify(provider).call(any(Prompt.class));
+      verify(transactions).recoverOperation(any());
+      verifyNoInteractions(store);
     }
   }
 

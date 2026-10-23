@@ -32,6 +32,13 @@ class LedgerCursorsTests {
     String token = cursors.issue("personal", 4, range, RangeFilter.EXPENSE, key);
     assertThat(cursors.resolve("personal", 4, range, RangeFilter.EXPENSE, Optional.of(token)))
         .contains(key);
+    fails(() -> cursors.resolve("personal", 4, range, RangeFilter.FOOD, Optional.of(token)),
+        LedgerException.Code.INVALID_CURSOR);
+    String foodToken = cursors.issue("personal", 4, range, RangeFilter.FOOD, key);
+    assertThat(cursors.resolve("personal", 4, range, RangeFilter.FOOD, Optional.of(foodToken)))
+        .contains(key);
+    fails(() -> cursors.resolve("personal", 4, range, RangeFilter.EXPENSE,
+        Optional.of(foodToken)), LedgerException.Code.INVALID_CURSOR);
     fails(() -> cursors.resolve("personal", 4, Optional.of(token)), LedgerException.Code.INVALID_CURSOR);
     fails(() -> cursors.resolve("foreign", 4, range, RangeFilter.EXPENSE, Optional.of(token)),
         LedgerException.Code.INVALID_CURSOR);

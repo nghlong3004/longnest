@@ -98,15 +98,20 @@ class LedgerRangeTests {
     return rows.stream().filter(row -> row.owner().equals("personal") && !row.deleted()
         && !row.intent().transactionDate().isBefore(range.from())
         && !row.intent().transactionDate().isAfter(range.to())
-        && filter.includes(row.intent().draft().type()))
+        && filter.includes(row.intent().draft().type(), row.intent().draft().category()))
         .sorted(Comparator.comparing((Entry row) -> row.intent().transactionDate())
             .thenComparingLong(Entry::id).reversed()).toList();
   }
 
   static Entry row(long id, String owner, TransactionType type, long amount, String date,
       boolean deleted) {
+    return row(id, owner, type, Category.UNCATEGORIZED, amount, date, deleted);
+  }
+
+  static Entry row(long id, String owner, TransactionType type, Category category, long amount,
+      String date, boolean deleted) {
     return new Entry(owner, id, 1, new CreateIntent(new TransactionDraft(type, new Money(amount),
-        Category.UNCATEGORIZED, new Note("ghi chú " + id)), LocalDate.parse(date)),
+        category, new Note("ghi chú " + id)), LocalDate.parse(date)),
         NOW.minusSeconds(id), Optional.empty(), deleted);
   }
 
@@ -176,6 +181,56 @@ class LedgerRangeTests {
         .thenReturn(new Totals(huge, BigInteger.TEN, BigInteger.ONE, BigInteger.ONE));
     assertThat(queries.aggregate(HOST, OCTOBER, RangeFilter.ALL).net())
         .isEqualTo(huge.subtract(BigInteger.ONE).toString());
+  }
+
+  @Test
+  void foodTotalsAndPagesIncludeOnlyActiveOwnedFoodExpensesAcrossFullRange() {
+    for (int id = 1; id <= 12; id++) {
+      rows.add(row(id, "personal", TransactionType.EXPENSE, Category.FOOD, 40_000,
+          "2026-10-20", false));
+    }
+    rows.add(row(20, "personal", TransactionType.EXPENSE, Category.GROCERIES, 900_000,
+        "2026-10-20", false));
+    rows.add(row(21, "personal", TransactionType.EXPENSE, Category.UNCATEGORIZED, 900_000,
+        "2026-10-20", false));
+    rows.add(row(22, "personal", TransactionType.INCOME, Category.SALARY, 900_000,
+        "2026-10-20", false));
+    rows.add(row(23, "personal", TransactionType.EXPENSE, Category.FOOD, 900_000,
+        "2026-10-20", true));
+    rows.add(row(24, "foreign", TransactionType.EXPENSE, Category.FOOD, 900_000,
+        "2026-10-20", false));
+    rows.add(row(25, "personal", TransactionType.EXPENSE, Category.FOOD, 900_000,
+        "2026-11-01", false));
+
+    var first = queries.list(HOST, OCTOBER, RangeFilter.FOOD, Optional.empty());
+    assertThat(first.entries()).hasSize(10).extracting(view -> view.id())
+        .containsExactly("12", "11", "10", "9", "8", "7", "6", "5", "4", "3");
+    var summary = first.summary().orElseThrow();
+    assertThat(summary.filter()).isEqualTo(RangeFilter.FOOD);
+    assertThat(summary.incomeTotal()).isEqualTo("0");
+    assertThat(summary.expenseTotal()).isEqualTo("480000");
+    assertThat(summary.expenseCount()).isEqualTo("12");
+    assertThat(summary.net()).isEqualTo("-480000");
+    assertThat(queries.aggregate(HOST, OCTOBER, RangeFilter.FOOD)).isEqualTo(summary);
+    assertThatThrownBy(() -> queries.list(HOST, OCTOBER, RangeFilter.EXPENSE,
+        first.nextCursor())).isInstanceOfSatisfying(LedgerException.class,
+            error -> assertThat(error.getCode()).isEqualTo(LedgerException.Code.INVALID_CURSOR));
+    var second = queries.list(HOST, OCTOBER, RangeFilter.FOOD, first.nextCursor());
+    assertThat(second.entries()).extracting(view -> view.id()).containsExactly("2", "1");
+    assertThat(second.summary()).contains(summary);
+    assertThat(second.nextCursor()).isEmpty();
+  }
+
+  @Test
+  void foodPageRejectsWrongCategoryEvenIfStoreReturnsIt() {
+    rows.add(row(1, "personal", TransactionType.EXPENSE, Category.FOOD, 1,
+        "2026-10-20", false));
+    when(store.range(eq("personal"), eq(OCTOBER), eq(RangeFilter.FOOD), any()))
+        .thenReturn(List.of(row(2, "personal", TransactionType.EXPENSE, Category.GROCERIES, 1,
+            "2026-10-20", false)));
+    assertThatThrownBy(() -> queries.list(HOST, OCTOBER, RangeFilter.FOOD, Optional.empty()))
+        .isInstanceOfSatisfying(LedgerException.class,
+            error -> assertThat(error.getCode()).isEqualTo(LedgerException.Code.NOT_SAVED));
   }
 
   @Test

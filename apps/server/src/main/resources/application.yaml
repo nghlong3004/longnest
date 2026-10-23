@@ -34,4 +34,5 @@ longnest:
 # Upstream's malformed-response warning can include prompts. Never log that class.
 logging:
   level:
+    org.springframework.ai: "OFF"
     org.springframework.ai.deepseek.DeepSeekChatModel: "OFF"

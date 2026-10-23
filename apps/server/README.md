@@ -9,125 +9,90 @@ API dependency is now declared using the existing 1.6.3 version property; proces
 and Lombok binding configuration is unchanged. No existing dependency version
 changed. Docker/container execution is not part of this verification.
 
-## Opt-in DeepSeek capture fallback
+## Opt-in DeepSeek conversation
 
-`InputInterpreter` is the reusable draft/read-intent/clarification boundary. Normal ledger
-wiring selects the existing rules. `LONGNEST_DEEPSEEK_ENABLED=true` selects rules
-first plus `DeepSeekInterpreter`; init/smoke cannot construct this provider binding.
-The existing `org.springframework.ai:spring-ai-starter-model-deepseek` and BOM
-2.0.1 are reused, with no POM/dependency change or handwritten provider HTTP codec.
-[Spring AI compatibility](https://docs.spring.io/spring-ai/reference/getting-started.html)
-documents Boot 4.0/4.1 support; [DeepSeek integration](https://docs.spring.io/spring-ai/reference/api/chat/deepseek-chat.html)
-documents the selected `DeepSeekApi`/`DeepSeekChatModel` manual binding. Actual
-Java25/Boot4.1.1 local evidence belongs in CURRENT STATUS, not these documentation claims.
+NATIVE-AI-1 replaces the former bespoke capture/range JSON interpreters with Spring
+AI 2.0.1 ChatClient, native @Tool callbacks, ToolCallingManager and bounded
+MessageWindowChatMemory. No dependency/POM or database schema is added. Default
+operation remains local deterministic capture and explicit commands/buttons.
+The historical [capture fallback](#opt-in-deepseek-capture-fallback) anchor below
+redirects readers to this replacement, not an additional runtime layer.
 
-The **capture route** does not interpret relative dates, edits or model tools.
-Only `UNSUPPORTED/UNKNOWN_PHRASE` with one exact locally
-parseable amount and conservative lexical safety checks is eligible. Ready,
-rejected, missing-fact, ambiguous, conflicting, relative-date, debt/transfer and
-explicit-command paths never reach the model. Spelled units nghìn/ngàn/triệu may
-normalize locally; bare 45 remains 45 dong. Unsafe or unsupported syntax stays local.
-No general natural-language safety or prompt-injection guarantee is claimed.
+### Opt-in DeepSeek capture fallback
 
-Capture model output has exactly four string fields: `status`, `canonicalText`,
-`amountEvidence`, `typeEvidence`. CREATE is re-parsed with the existing rules;
-the amount must equal locally extracted evidence and its original substring.
-The note must occur in the source text; explicit type cues must agree. Unknown/
-duplicate fields, arrays/tools, extra JSON, truncation, missing/conflicting facts,
-or a CLARIFY result cannot save. Original source categories are not invented;
-the ordinary rules may retain UNCATEGORIZED. For example, synthetic
-`Mình vừa trả 45 nghìn cho bữa trưa.` can yield `-45000 bữa trưa` (uncategorized).
-This is a fake-response example, not measured DeepSeek language accuracy.
+This historical name is superseded by the conversation route above. The old
+DeepSeekInterpreter/RangeQueryInterpreter and their JSON protocols are removed.
 
-Authentication/commands/field prompts precede interpretation. The host checks
-`requiresRecovery(text)` and calls `LedgerClient.recoverCreateIfPresent(context)`
-**before** eligible fallback. Existing frozen intent/receipt is authoritative,
-including after failed delivery/restart; no second model call or fresh purchase.
-Unavailable storage stops interpretation. New drafts pass the same validated
-ingest/create service; success is rendered only after its transaction proxy returns.
-No database transaction is held during the provider call. Other adapters must
-follow this recovery rule and supply their own trusted event context, never model IDs.
+### Behavior and boundaries
 
-### Conversational explicit-date queries
+When enabled, non-ready ordinary text goes through one native model request;
+known invalid/ambiguous money, conflicting types and rejected local input stay
+local. Clear supported captures, slash commands and authenticated edit prompts/
+Save/Delete/Cancel controls still bypass inference. Native callbacks support
+list/recent/get, clear create, edit preview, Delete request, Restore and clarification.
+There is no model Save/Confirm/Cancel tool, SQL access or model-selected identity.
 
-NL-QUERY-1 extends the same default-off interpreter with **LIST_RANGE | CLARIFY**,
-not a native tool/agent loop. Synthetic example interactions:
+With frozen Vietnam business date 2026-10-23, synthetic interactions include:
 
-- `Cho tôi các khoản chi từ 2026-10-01 đến 2026-10-23.` → expense summary and list.
-- `Liệt kê khoản thu từ 2026-10-01 đến 2026-10-23.` → income summary and list.
-- `Xem giao dịch từ 2026-10-01 đến 2026-10-23.` → income/expense/net and list.
-- `Mình đã chi bao nhiêu từ ngày 2026-10-01 tới ngày 2026-10-23?` → expense total
-  plus selectable entries, not a model-calculated amount.
-- `Cho tôi các khoản chi hôm qua` → Vietnamese clarification for two explicit dates;
-  no context/date inference, query or mutation.
+- “hôm qua anh chi bao nhiêu?” → expense total and selectable entries for October 22.
+- “tháng này thì sao?” → retain the expense scope, October 1 through October 23.
+- “chỉ tiền ăn thôi” → retain dates, select EXPENSE + Category.FOOD only, not groceries.
+- An ordinary reply to a conversational page can continue the conversation;
+  replies to actual field prompts keep the immutable preview → user Save path.
 
-This is a small step toward ordinary conversation, not full conversational
-understanding. Recognized request cues/questions are guarded **before capture**,
-even when the provider is disabled; they cannot fall through as purchases.
-Clear asserted capture still saves immediately. Field-prompt replies and explicit
-commands/callbacks keep their existing routing and real-user confirmation rules.
-The lexical question guard is bounded, not a guarantee to recognize every phrasing.
+The model chooses semantic TODAY/YESTERDAY/THIS_MONTH/LAST_MONTH or explicit ISO
+endpoints; application code resolves calendar arithmetic from the authenticated
+message reference in Asia/Ho_Chi_Minh. THIS_MONTH is month-to-date; LAST_MONTH is the
+whole previous month. KEEP requires a validated previous query. Unsupported category/
+note filters, fuzzy targets or missing facts must clarify. Literal current-message
+amounts use exact local Money conversion, including nghìn/ngàn/triệu; bare 45 stays
+45 VND. Selected or explicitly supplied IDs are authorized by shared services.
+Semantic correctness still depends on the model; fake responses do not demonstrate
+Vietnamese accuracy, arbitrary intent safety or prompt-injection resistance.
 
-Supported source range: exactly two real `YYYY-MM-DD` dates in source order using
-`từ [ngày] A đến/tới [ngày] B` (documented accentless aliases also work), inclusive,
-1900–9999, A <= B. An equal-endpoint range is one day. Income/expense/all scope must
-be explicit; both types use `thu và chi`/`thu chi`, or general `giao dịch`.
-Missing/reversed/invalid dates, conflicting scope, known unsupported category,
-currency, amount/ID qualifiers, action requests and relative/contextual dates clarify
-without a provider call. No silent date repair, swapping, endpoint/type default,
-foreign currency conversion or target inference. Unrecognized semantics still
-depend on model clarification; finite source checks do not prove arbitrary language.
+Only one completed, schema-validated native call may execute per turn. Duplicate/
+foreign fields, unknown tools, multi-call responses, truncation or narrated success
+cannot dispatch. Host-only context carries identity, event, reference and target
+revision; callbacks call existing services, and Vietnamese rendering uses only
+service results. No ledger contents or tool results return to the model, and no
+second model call/automatic tool loop is made. Native tools are standard function
+schemas, not DeepSeek beta strict-function/schema guarantees.
 
-The query JSON has exactly six string fields: `intent`, `from`, `to`, `filter`,
-`intentEvidence`, `filterEvidence`. Only LIST_RANGE with matching literal source
-endpoints, allowed INCOME/EXPENSE/ALL and original request/scope evidence becomes
-an immutable ListRange intent. CLARIFY, foreign/duplicate fields, tool calls,
-truncation or a capture-shaped result cannot dispatch any query or mutation.
-Failed interpretation uses query-specific Vietnamese guidance, not a purchase receipt.
+Before inference, recover any frozen create, preview/Delete request or completed
+Restore for the same host event. Storage failure stops interpretation. Recovery
+returns the original outcome, not a claim the record is still current; shared
+services preserve fingerprints/revisions and actual-user displayed-target proofs.
+No DB lock is held during inference. There is no exactly-once reply/charge promise;
+read-only deliveries can be reinterpreted and re-read.
 
-Authenticated Telegram dispatch calls existing `LedgerClient.list`/`LedgerQueryService.list`;
-the existing renderer presents exact full-range summary/counts/net and ten-entry
-pages. Next/Previous use existing bounded cursors; selection re-gets the current
-revision and exposes existing L2 controls. **No records/results go back to the
-model**, no second inference/narration and no model-supplied principal/proof/SQL.
-New read events do not freeze create intents; repeated query delivery may re-read
-current state/reinterpret, not write a transaction. There is no exactly-once
-provider-charge or read-response delivery claim.
+Conversation identity is host-derived from principal + bot/private-user scope.
+Memory keeps at most eight bounded user utterances, no assistant/tool results;
+validated query and selected target metadata expire after ten idle minutes.
+Sixteen conversation contexts maximum; restart, eviction and /reset clear temporary
+context, not ledger or durable confirmations. User utterances/history would leave
+the host if enabled: this exposure needs explicit live privacy approval.
 
-Provider-disabled operation offers clarification/explicit commands rather than
-silently activating inference. Query and capture share the existing activation
-names and bounded SDK settings below; no new dependency or env key was introduced.
-No multi-turn memory, follow-up fragment completion, fuzzy record selection,
-relative-date grounding or natural-language Edit/Delete/Restore is implemented.
-Explicit commands and authenticated buttons remain available for those ledger flows.
+### Configuration and live limits
 
-After separate live approval only, privately inject these names (no values here):
+After separate live approval only, privately supply the existing names:
 
-- `LONGNEST_DEEPSEEK_ENABLED`: default false, explicit true opts into code routing.
-- `LONGNEST_DEEPSEEK_API_KEY`: required private credential when enabled.
-- `LONGNEST_DEEPSEEK_BASE_URL`: required; this binding accepts only
-  `https://api.deepseek.com`, no redirects or third-party destinations.
-- `LONGNEST_DEEPSEEK_MODEL`: required explicit model identifier, no default alias.
+- LONGNEST_DEEPSEEK_ENABLED: default false; true opts into the code route.
+- LONGNEST_DEEPSEEK_API_KEY: explicit private credential.
+- LONGNEST_DEEPSEEK_BASE_URL: exactly https://api.deepseek.com, no redirects.
+- LONGNEST_DEEPSEEK_MODEL: explicit model identifier, no default alias.
 
-Root `.env.dev` loading through `bash scripts/dev-server.sh` and inherited-env
-precedence already apply to these names; direct Spring startup does not read that
-file. No private env file was inspected/changed. Keep `spring.ai.model.chat=none`:
-the dedicated factory owns its default-off binding, not automatic generic model routing.
-Configuration is not permission for egress/spend. Live route/model, permitted data,
-privacy/retention/region/terms, credential custody and monetary/session request
-limits still require explicit decisions. This binding sends only one bounded
-utterance and fixed instructions, no owner, Telegram identity, history or ledger.
+Init/smoke cannot construct the provider. Keep spring.ai.model.chat=none; the
+opt-in factory owns this binding. Root .env.dev loading remains explicit through
+the dev launcher; no private file was read/changed. Configuration is not authority
+for egress, paid calls or live operation. Model/endpoint, permitted utterance/history
+data, retention/region/terms, credential custody and monetary caps remain unresolved.
 
-Requests use JSON-object mode, explicitly disabled thinking, maximum 512 output
-tokens, no tools/streaming or automatic retry (one attempt per interpretation).
-Connect timeout is 2 seconds, HTTP read timeout 8 seconds, overall caller deadline
-10 seconds with cancellation on timeout/interruption. No auth/balance/429/invalid
-output retry or provider switch. Cancellation does not prove the provider did not
-charge a request; token/request bounds are not a monetary budget. Busy/runtime
-failures return externalized Vietnamese clarification, never narrated success.
-The upstream model's malformed-response logger is disabled because it can include
-prompts; no app prompt/response/exception-body logs or tracing is added. Do not enable
-wire/body debugging or prompt-capturing observation in a live configuration.
+Requests disable thinking, cap output at 512 tokens, use one attempt/no retry, and
+retain connect/read/caller deadlines of 2/8/10 seconds. One active model request and
+60 attempts per process-local one-hour window bound workload, not money; restart resets the
+count and cancellation cannot prove an uncharged request. No token/spend accounting
+or persistent quota exists. Spring AI logging is disabled because upstream errors
+may include prompts; do not enable body/prompt/tool-content logging or tracing.
 
 ## Build and safe smoke
 

@@ -47,7 +47,7 @@ are invalid. Date/amount/category/note limits are canonical in Domain.
 | CommitUpdate / ConfirmDelete (host only) | actionId and trustedUserProof of the actual authenticated Save/Confirm interaction. Commit accepts no replacement patch/target. |
 | RequestDelete / Restore | id and expectedRevision. Delete requests a preview; Restore is explicit user intent on a retained owned deleted record. |
 | Get / Recent | get(id); recent(cursor?) with at most 10 active entries, ordered createdAt descending then ID descending. |
-| Range queries | aggregate(range, typeFilter); list(range, typeFilter, cursor?). Both endpoints required; filter all/income/expense, default all. Range lists order financial date descending then ID descending. |
+| Range queries | aggregate(range, filter); list(range, filter, cursor?). Both endpoints required; all/income/expense or FOOD (expense + Category.FOOD), default all. Range lists order financial date descending then ID descending. |
 
 Use a tagged result: status=ok with resultKind/data; needs_clarification with code/
 fields and supported resubmission example; or error with code/field?/retryable/
@@ -299,7 +299,8 @@ mapping/query validation, locks and concurrent snapshot behavior remain unverifi
 
 ## Telegram → application → future LLM capability matrix
 
-These eight future tool names are a bounded design catalog, **not installed tools**.
+This is the logical service catalog; NATIVE-AI-1's installed bounded subset is
+listed below, not every proposed tool spelling here is registered.
 Every row uses host-trusted context, the same value/access/replay checks and typed
 results. Model arguments cannot include actor, confirmed=true or persistence access.
 
@@ -327,68 +328,58 @@ free-text edit/delete command syntax or fuzzy record search is required.
 A deleted receipt/get view exposes Restore. All state-changing controls follow
 the same application boundary; there is no direct-update bypass for future tools.
 
-## Future interpretation strategies
+## Native conversational interpretation
 
-Rules-first DeepSeek capture fallback (DS-FALLBACK-1) and explicit-date read
-interpretation (NL-QUERY-1) are selected for bounded default-off code;
-live endpoint/model approval, egress/privacy and monetary limits remain unresolved.
-See [exact routing/configuration](../apps/server/README.md#opt-in-deepseek-capture-fallback)
-and CURRENT STATUS for implementation acceptance. Default remains local rules.
-InputInterpreter returns a validated draft, immutable ListRange read intent or
-clarification, not host context, saved claims, arithmetic or action proof. The host
-dispatches ListRange through existing LedgerClient.list/query service and renders
-its matching full-range summary and selectable page directly, without model result
-egress or another inference. Explicit ISO source endpoints and type/all evidence
-are locally checked. Read-request classification precedes capture; missing dates
-clarify rather than creating a purchase. No native tools, relative-date/context
-resolution or natural-language edit/action dispatcher is installed.
+NATIVE-AI-1 supersedes DS-FALLBACK-1 and NL-QUERY-1 at the same default-off activation
+boundary. Spring AI ChatClient and native callbacks replace bespoke JSON interpreters;
+local supported capture/commands remain direct. See [configuration and limits](../apps/server/README.md#opt-in-deepseek-conversation)
+and CURRENT STATUS for exact candidate/evidence. The capability matrix above remains
+the service catalog; installed callbacks are list/recent/get/create/preview-update/
+request-delete/restore/clarify. Aggregate information comes with the authoritative
+list summary, not a separate model arithmetic tool. Save/Confirm/Cancel stay host-only.
 
-Before eligible nondeterministic capture interpretation, the authenticated host invokes
-TransactionService.recoverCreateIfPresent through LedgerClient. Its short
-transaction recovers a frozen create/original receipt or explicitly returns empty;
-unavailable/conflicting storage is not absence. The provider runs outside that
-transaction, then ingest/create uses the original host event identity. Concurrent
-different drafts conflict instead of creating another purchase. Existing inbox/
-schema is reused, without storing raw prose or introducing a retention policy.
+The host freezes reference time from authenticated message or receipt, supplies
+Vietnam business date and validated previous query metadata, and derives conversation
+identity from principal + bot/user/private-chat scope. Model periods TODAY/YESTERDAY/
+THIS_MONTH/LAST_MONTH resolve locally; explicit dates use DateRange. THIS_MONTH is
+inclusive month-to-date, LAST_MONTH the whole previous month. FOOD is exactly active
+EXPENSE + Category.FOOD; matching full-range totals and keyset pages share the existing
+read snapshot and cursor bindings. KEEP reuses only validated dimensions; no context
+means clarification, never guessed dates/filter. Unsupported categories/note search
+must clarify, not silently post-filter a page.
 
-Default input uses the [bounded deterministic grammar](DOMAIN.md#selected-first-release-grammar).
-The broader design alternatives below do not imply live execution authority:
+One model request proposes exactly one native callback. Strict argument validation
+precedes controlled ToolCallingManager execution; multi-call/unknown/malformed/
+truncated responses never dispatch. Tools receive trusted context outside model
+arguments. Create uses literal current amount and local exact Money/date/category/
+note validation; get/action targets must be explicit or host-selected. Edit creates
+an immutable preview and Delete only requests confirmation. Restore uses the ordinary
+authorized revision/replay service. No model can supply proof, owner, event identity,
+authoritative totals, or perform actual-user Save/Confirm/Cancel.
 
-| Strategy | Interpretation route | What stays unchanged |
-| --- | --- | --- |
-| A: rules first, LLM fallback (selected, default off) | Rules produce a ready intent or classify unsupported phrasing. The bounded capture fallback may interpret eligible UNKNOWN_PHRASE input. Missing business facts still go to the user. | Typed intent/result schema, two application services, domain validation, access/idempotency/delete confirmation and store. |
-| B: LLM replaces rules | All input text goes to the future LLM interpreter, producing the same intent/tool request or clarification; buttons/explicit control actions can still route directly. | Exactly the same services, values and safeguards. No duplicate salary/expense/CRUD business implementation in prompts. |
+Before interpretation, TransactionService.recoverOperation recovers frozen create,
+update/delete preview or completed direct Restore under the original event/scope.
+It reuses existing inbox/control records, with no schema/raw-prose archive. Conflict/
+unavailable storage is not absence. Recovery holds the short service transaction,
+then releases it before inference. New dispatch still uses shared fingerprints and
+revision checks. Returned previews can be stale/expired; durable display/proof checks
+remain authoritative. Existing captured creates can finish recovery before a reply.
 
-Switching changes the input-interpreter selection/routing, language coverage and
-the later provider/privacy/cost/latency concerns; it does not change Money, DateRange,
-transaction lifecycle, tools or persistence rules. A future typed intent may request
-a read or mutation, not just propose a create transaction. Tool output/result status
-is authoritative, not a model's narrated “saved”. Unresolved mutation ambiguity never
-executes. Known invalid/unsafe input does not become valid just because an LLM was tried.
+ChatMemory retains eight user-only utterances and bounded validated query/target
+metadata, ten-minute idle expiry, sixteen contexts, explicit /reset and no restart
+persistence. Ordinary reply-to conversation/page is distinct from durable field
+prompts. Neither assistant/native call arguments nor ledger/tool results enter
+history. Vietnamese receipts/pages/previews render directly from services; there is
+no second provider narration or ledger-result egress. User/history egress is still
+sensitive and unapproved for live use. No fuzzy selection, arbitrary filters or
+unlimited agent loop is implemented.
 
-Examples (future LLM calls below are illustrative only):
-
-- `ăn trưa 45k`: rules now yield Create expense 45,000 VND/food; the service saves
-  immediately after validation. Either future strategy must reach the same operation.
-- `Mình vừa trả 45 nghìn cho bữa trưa.`: outside today's finite grammar, but has
-  enough facts for a future interpreter to propose that same Create intent. This
-  is parser coverage uncertainty, not a reason to duplicate financial rules.
-- `ăn trưa`: amount is genuinely missing; ask “Bao nhiêu tiền?” Neither strategy
-  invents a typical lunch price. `45k` lacks type; ask income or expense. Category
-  is optional; `-45k đồ dùng` can use uncategorized rather than forcing a category quiz.
-- `Hôm qua mình ăn trưa hết 45 nghìn`: with host business date 2026-10-20 in
-  Asia/Ho_Chi_Minh, a future LLM can propose financial date 2026-10-19. It must use
-  the supplied reference and the same date validator. Current rules do not parse
-  relative dates; explicit Edit Date remains available today in the design.
-- `Xóa khoản ăn trưa`: if several entries match, list/select and ask which one.
-  With #42 selected, tool requests deletion → service returns a target-bound prompt
-  → authenticated human clicks Confirm Delete → host-only confirmDelete commits.
-  A model's “user confirmed”, a guessed ID, an old confirmation or `confirmed:true`
-  cannot delete. Restore later calls the ordinary restore capability.
-
-No live LLM calls, agent platform or external financial-data transmission is
-authorized. Existing Spring AI 2.0.1 is reused for fallback code; live endpoint/
-model, cost and privacy decisions remain separate from implementation.
+Fixed host checks cannot establish arbitrary semantic correctness. Live Vietnamese
+accuracy and intent/prompt-injection behavior require separately authorized model
+trials. [Spring AI native tools](https://docs.spring.io/spring-ai/reference/api/tools.html)
+and [memory](https://docs.spring.io/spring-ai/reference/api/chat-memory.html) document
+the reused APIs; fake/SDK fixtures establish local integration, not provider quality.
+Provider privacy, monetary cap, credential and live execution decisions remain open.
 
 ## Future finance capabilities
 

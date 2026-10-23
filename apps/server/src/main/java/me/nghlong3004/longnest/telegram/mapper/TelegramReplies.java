@@ -162,7 +162,8 @@ public class TelegramReplies {
           summary.expenseTotal(), summary.expenseCount(), summary.net());
     } else {
       boolean income = summary.filter() == RangeFilter.INCOME;
-      body = messages.text("range.type", messages.text("entry.type." + summary.filter()),
+      body = messages.text("range.type", messages.text(summary.filter() == RangeFilter.FOOD
+          ? "range.food" : "entry.type." + summary.filter()),
           income ? summary.incomeTotal() : summary.expenseTotal(),
           income ? summary.incomeCount() : summary.expenseCount());
     }
@@ -172,9 +173,10 @@ public class TelegramReplies {
 
   public String invalidRange() { return messages.text("range.invalid"); }
 
+  public String conversation(String key) { return messages.text(key); }
+
   public String problem(Problem problem) {
-    if (problem.code() == InterpretationResult.Code.QUERY_CLARIFICATION
-        || problem.code() == InterpretationResult.Code.QUERY_UNAVAILABLE) {
+    if (problem.code() == InterpretationResult.Code.QUERY_CLARIFICATION) {
       return messages.text("query.clarification", messages.text("error." + problem.code()),
           problem.example());
     }

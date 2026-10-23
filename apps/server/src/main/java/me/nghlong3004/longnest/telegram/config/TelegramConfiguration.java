@@ -18,6 +18,8 @@ import me.nghlong3004.longnest.telegram.model.TelegramSettings;
 import me.nghlong3004.longnest.telegram.model.TelegramNavigation;
 import okhttp3.OkHttpClient;
 import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.ObjectProvider;
+import me.nghlong3004.longnest.conversation.ConversationAssistant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
@@ -41,7 +43,7 @@ public class TelegramConfiguration {
   @Bean
   TelegramLifecycle telegramLifecycle(TelegramSettings settings, PersonalOwner owner,
       TransactionMapper mapper, LedgerClient ledger, Clock clock, UiMessages messages,
-      ControlProofs proofs, InputInterpreter interpreter,
+      ControlProofs proofs, InputInterpreter interpreter, ObjectProvider<ConversationAssistant> conversation,
       @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor) {
     // SDK uses Jackson 2 internally; Boot's Jackson 3 bean is untouched.
     var http = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(5))
@@ -62,6 +64,7 @@ public class TelegramConfiguration {
     var capture = new TelegramCapture(client, settings, owner, interpreter,
         mapper, ledger, new TelegramReplies(messages), clock,
         new TelegramNavigation(clock, new SecureRandom()), proofs);
+    capture.setConversation(conversation.getIfAvailable());
     var scheduler = Executors.newSingleThreadScheduledExecutor(
         Thread.ofPlatform().name("telegram-sdk-poll").factory());
     var application = new TelegramBotsLongPollingApplication(

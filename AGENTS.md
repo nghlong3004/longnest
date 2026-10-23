@@ -21,6 +21,10 @@ DS-FALLBACK-1 additionally authorizes default-off DeepSeek interpretation code a
 fake-provider/local verification, not provider activation, credentials or egress.
 NL-QUERY-1 extends that code authority to bounded explicit-date read intents and
 direct local rendering, not native tools, conversational memory or live effects.
+NATIVE-AI-1 supersedes those interpreters with default-off Spring AI native tools,
+bounded memory and grounded dates/follow-ups, retaining shared service/confirmation
+controls. THIS_MONTH means month-to-date; FOOD means only Category.FOOD.
+This adds code/fake-provider authority, not live execution or egress.
 No live messaging/data egress, paid/LLM calls, deployment, DB installation or broad
 infrastructure/credential changes. Inspected project baseline/increment Git stage,
 commit and push are authorized only with usable existing permissions and verified

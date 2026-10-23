@@ -88,6 +88,21 @@ class DomainValuesTests {
   }
 
   @Test
+  void foodFilterIsExpenseTypeCompatibilityButRequiresExactFoodCategory() {
+    assertThat(RangeFilter.FOOD.includes(TransactionType.EXPENSE)).isTrue();
+    assertThat(RangeFilter.FOOD.includes(TransactionType.INCOME)).isFalse();
+    assertThat(RangeFilter.FOOD.includes(TransactionType.EXPENSE, Category.FOOD)).isTrue();
+    assertThat(RangeFilter.FOOD.includes(TransactionType.EXPENSE, Category.GROCERIES)).isFalse();
+    assertThat(RangeFilter.FOOD.includes(TransactionType.EXPENSE, Category.UNCATEGORIZED))
+        .isFalse();
+    assertThat(RangeFilter.FOOD.includes(TransactionType.INCOME, Category.SALARY)).isFalse();
+    assertThat(RangeFilter.EXPENSE.includes(TransactionType.EXPENSE, Category.GROCERIES)).isTrue();
+    assertThat(RangeFilter.ALL.includes(TransactionType.INCOME, Category.SALARY)).isTrue();
+    assertThatNullPointerException()
+        .isThrownBy(() -> RangeFilter.FOOD.includes(TransactionType.EXPENSE, null));
+  }
+
+  @Test
   void mandatoryDomainValuesCannotBeNull() {
     assertThatNullPointerException().isThrownBy(() -> Money.parse(null));
     assertThatNullPointerException().isThrownBy(() -> new Note(null));

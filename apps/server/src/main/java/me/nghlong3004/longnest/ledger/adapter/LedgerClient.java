@@ -9,6 +9,7 @@ import me.nghlong3004.longnest.ledger.dto.RangeSummary;
 import lombok.RequiredArgsConstructor;
 import me.nghlong3004.longnest.ledger.dto.LedgerResult;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
+import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
 import me.nghlong3004.longnest.ledger.dto.ControlBinding;
 import me.nghlong3004.longnest.ledger.dto.FieldPrompt;
@@ -46,12 +47,12 @@ public class LedgerClient {
     });
   }
 
-  public LedgerResult<MutationReceipt> recover(HostContext context) {
-    return call(context, true, () -> transactions.create(context));
+  public LedgerResult<Optional<OperationRecovery>> recoverOperation(HostContext context) {
+    return call(context, true, () -> transactions.recoverOperation(context));
   }
 
-  public LedgerResult<Optional<MutationReceipt>> recoverCreateIfPresent(HostContext context) {
-    return call(context, true, () -> transactions.recoverCreateIfPresent(context));
+  public LedgerResult<MutationReceipt> recover(HostContext context) {
+    return call(context, true, () -> transactions.create(context));
   }
 
   public LedgerResult<List<String>> pendingCreates(HostContext context, String operationPrefix) {
