@@ -47,7 +47,11 @@ that ignores SIGINT has that shell's normal inherited-signal limitations.
 
 A readable `.env.dev` is required even when values are supplied via exported
 environment. Users manage that private file themselves; never commit it, paste
-secrets into chat, or run this launcher with shell tracing. Safe **synthetic-only**
+secrets into chat, or run this launcher with shell tracing. The tracked root
+[.env.example](../.env.example) lists current backend and default-off integration
+settings. Copy it to `.env.dev` only if that private file is absent; otherwise
+merge deliberately without overwriting existing values. Root `.env` is a separate
+prepared file and is still not loaded by this launcher. Safe **synthetic-only**
 example content, matching the disposable [dev database](../deploy/README.md):
 
 ```dotenv
@@ -106,6 +110,8 @@ The [server fallback documentation](../apps/server/README.md#opt-in-deepseek-cap
 defines required settings, timeout/recovery limits and separate live egress/spend
 approval. Omission keeps deterministic interpretation; this launcher grants no
 provider permission. Compose does not consume or forward these names.
+Native conversation leaves output-token limits unset for provider/model defaults;
+legacy DEEPSEEK_MAX_TOKENS is not mapped. Output length/cost are not guaranteed.
 
 Low → high: existing application defaults → literal `.env.dev` values → already
 exported process environment. An exported empty value wins, so an empty required

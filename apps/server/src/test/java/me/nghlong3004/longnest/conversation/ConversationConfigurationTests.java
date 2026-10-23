@@ -53,7 +53,9 @@ class ConversationConfigurationTests {
           var body = JsonMapper.builder().build().readTree(
               ((MockClientHttpRequest) request).getBodyAsString());
           assertThat(body.path("model").asText()).isEqualTo("synthetic-model");
-          assertThat(body.path("max_tokens").asInt()).isEqualTo(512);
+          assertThat(body.has("max_tokens")).isFalse();
+          assertThat(body.has("max_completion_tokens")).isFalse();
+          assertThat(body.has("max_output_tokens")).isFalse();
           assertThat(body.path("thinking").path("type").asText()).isEqualTo("disabled");
           assertThat(body.path("tools").size()).isEqualTo(8);
           assertThat(body.toString()).contains("list_transactions", "preview_update", "clarify")
@@ -69,6 +71,7 @@ class ConversationConfigurationTests {
     var api = DeepSeekApi.builder().apiKey("synthetic-key").baseUrl("https://api.deepseek.com")
         .restClientBuilder(rest).build();
     var model = ConversationConfiguration.buildModel(api, "synthetic-model");
+    assertThat(model.getOptions().getMaxTokens()).isNull();
     var ledger = mock(LedgerClient.class);
     when(ledger.recoverOperation(any())).thenReturn(new LedgerResult.Ok<>(Optional.empty()));
     try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {

@@ -10,6 +10,10 @@ Make personal income/expense recording fast enough for daily Telegram use. Accep
 bounded Vietnamese language/shorthand such as `ăn trưa 45k` and `nhận lương 25tr`.
 The bot's durable ledger is authoritative. This is not unrestricted language
 comprehension, an LLM requirement or an authorization to operate a live service.
+Conversational use is for quick capture and financial questions, not extended
+social chat. Existing short bounded memory is sufficient. Available authenticated
+Telegram display names may personalize presentation only; a preferred nickname
+is a future convenience, not a preference-persistence requirement.
 
 ## Approved current release
 

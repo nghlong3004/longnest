@@ -374,6 +374,17 @@ no second provider narration or ledger-result egress. User/history egress is sti
 sensitive and unapproved for live use. No fuzzy selection, arbitrary filters or
 unlimited agent loop is implemented.
 
+Quick financial capture/questions, not extended social conversation, remain the
+goal; existing memory bounds are unchanged. After numeric Telegram authorization,
+available first/last display names pass only to the localized clarification
+renderer: NFC, allowlisted Unicode letters/digits/marks/basic separators, bounded
+to 64 code points, neutral fallback. Display text never enters HostContext, service
+arguments, provider prompts, conversation identity or memory. No nickname storage.
+Native output-token options are unset; the configured provider/model default is
+variable/unknown, not unlimited or necessarily cheaper. Legacy DEEPSEEK_MAX_TOKENS
+is not mapped. Single-tool, request/rate/concurrency/deadline and retry controls
+remain unchanged; live/privacy/cost decisions are not waived.
+
 Fixed host checks cannot establish arbitrary semantic correctness. Live Vietnamese
 accuracy and intent/prompt-injection behavior require separately authorized model
 trials. [Spring AI native tools](https://docs.spring.io/spring-ai/reference/api/tools.html)

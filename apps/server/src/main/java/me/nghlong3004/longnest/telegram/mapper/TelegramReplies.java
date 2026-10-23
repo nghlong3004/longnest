@@ -1,5 +1,6 @@
 package me.nghlong3004.longnest.telegram.mapper;
 
+import java.text.Normalizer;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -174,6 +175,27 @@ public class TelegramReplies {
   public String invalidRange() { return messages.text("range.invalid"); }
 
   public String conversation(String key) { return messages.text(key); }
+
+  /** Display text only: never pass a user-controlled label into identity, tools or model context. */
+  public String conversation(String key, String firstName, String lastName) {
+    var label = new StringBuilder();
+    for (String part : new String[] {firstName, lastName}) {
+      if (part == null) continue;
+      if (!label.isEmpty()) label.append(' ');
+      part.codePoints().limit(64)
+          .filter(cp -> Character.isLetterOrDigit(cp)
+              || Character.getType(cp) == Character.NON_SPACING_MARK
+              || Character.getType(cp) == Character.COMBINING_SPACING_MARK
+              || cp == ' ' || cp == '-' || cp == '\'' || cp == '.')
+          .forEach(label::appendCodePoint);
+    }
+    var bounded = new StringBuilder();
+    Normalizer.normalize(label, Normalizer.Form.NFC).replaceAll(" +", " ").strip()
+        .codePoints().limit(64).forEach(bounded::appendCodePoint);
+    String body = conversation(key);
+    return bounded.codePoints().anyMatch(Character::isLetterOrDigit)
+        ? messages.text("conversation.addressed", bounded.toString().strip(), body) : body;
+  }
 
   public String problem(Problem problem) {
     if (problem.code() == InterpretationResult.Code.QUERY_CLARIFICATION) {

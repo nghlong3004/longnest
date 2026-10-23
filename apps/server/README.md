@@ -25,6 +25,15 @@ DeepSeekInterpreter/RangeQueryInterpreter and their JSON protocols are removed.
 
 ### Behavior and boundaries
 
+This is quick personal-finance capture and questions, not extended social chat.
+The existing short memory is sufficient; no nickname preferences or persistence
+are added. For localized clarifications, Telegram may address the authenticated
+user by their available first/last display name. The renderer keeps at most 64
+Unicode code points, normalizes NFC and removes controls, markup and unsafe symbols;
+missing/unsupported labels retain neutral wording. This is literal presentation
+only: names never become principal, event/scope/proof, tool arguments, model prompt
+or memory. Financial receipts/pages/confirmation controls remain authoritative.
+
 When enabled, non-ready ordinary text goes through one native model request;
 known invalid/ambiguous money, conflicting types and rejected local input stay
 local. Clear supported captures, slash commands and authenticated edit prompts/
@@ -87,8 +96,11 @@ the dev launcher; no private file was read/changed. Configuration is not authori
 for egress, paid calls or live operation. Model/endpoint, permitted utterance/history
 data, retention/region/terms, credential custody and monetary caps remain unresolved.
 
-Requests disable thinking, cap output at 512 tokens, use one attempt/no retry, and
-retain connect/read/caller deadlines of 2/8/10 seconds. One active model request and
+Requests disable thinking and leave max-output tokens unset, so the configured
+provider/model default applies. Actual output length and cost are variable/unknown,
+not guaranteed unlimited, shorter or cheaper. Legacy DEEPSEEK_MAX_TOKENS is not
+mapped, and no replacement numeric cap is imposed. Requests still use one attempt/
+no retry and retain connect/read/caller deadlines of 2/8/10 seconds. One active model request and
 60 attempts per process-local one-hour window bound workload, not money; restart resets the
 count and cancellation cannot prove an uncharged request. No token/spend accounting
 or persistent quota exists. Spring AI logging is disabled because upstream errors

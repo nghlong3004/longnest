@@ -39,6 +39,36 @@ public class UiMessagesTests {
   private final UiMessages messages = vietnamese();
   private final TelegramReplies replies = new TelegramReplies(messages);
 
+  @Test
+  void conversationAddressIsNormalizedLiteralAndLocalized() {
+    String body = replies.conversation("conversation.AMOUNT");
+    assertThat(replies.conversation("conversation.AMOUNT",
+        "  Mi\u202Enh\n\u0000{0}<>&_`/😀  ", "  Nguye\u0302\u0303n  "))
+        .isEqualTo("Minh0 Nguyễn, " + body);
+    assertThat(replies.conversation("conversation.AMOUNT", "O'Brien", null))
+        .isEqualTo("O'Brien, " + body);
+    assertThat(replies.conversation("conversation.TYPE", null, "An"))
+        .isEqualTo("An, " + replies.conversation("conversation.TYPE"));
+  }
+
+  @Test
+  void missingOrUnsafeDisplayNameKeepsNeutralExistingCopy() {
+    String body = replies.conversation("conversation.DATES");
+    assertThat(replies.conversation("conversation.DATES", null, null)).isEqualTo(body);
+    assertThat(replies.conversation("conversation.DATES", " \n\u202E😀{}<> ", "..."))
+        .isEqualTo(body);
+  }
+
+  @Test
+  void displayNameIsBoundedByCodePointsNotUtf16Units() {
+    String letter = "𐐀";
+    String rendered = replies.conversation("conversation.AMOUNT", letter.repeat(100), "last");
+    assertThat(rendered).isEqualTo(letter.repeat(64) + ", "
+        + replies.conversation("conversation.AMOUNT"));
+    String label = rendered.substring(0, rendered.indexOf(','));
+    assertThat(label.codePointCount(0, label.length())).isEqualTo(64);
+  }
+
   private TransactionView view(String amount, String note) {
     return new TransactionView("9223372036854775807", "1", TransactionType.EXPENSE, amount,
         "VND", Category.FOOD, note, LocalDate.parse("2026-10-20"),

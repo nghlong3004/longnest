@@ -55,7 +55,7 @@ public class ConversationConfiguration {
   }
 
   static DeepSeekChatModel buildModel(DeepSeekApi api, String name) {
-    var options = DeepSeekChatOptions.builder().model(name).disableThinking().maxTokens(512).build();
+    var options = DeepSeekChatOptions.builder().model(name).disableThinking().build();
     return DeepSeekChatModel.builder().deepSeekApi(api).options(options)
         .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0))).build();
   }

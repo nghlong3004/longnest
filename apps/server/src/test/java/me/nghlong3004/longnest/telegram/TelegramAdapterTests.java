@@ -117,6 +117,51 @@ class TelegramAdapterTests {
   }
 
   @Test
+  void authenticatedDisplayNameIsPresentationOnlyAndForeignNameCannotImpersonate() throws Exception {
+    var provider = mock(ChatModel.class);
+    when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());
+    when(provider.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(
+        AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+            "clarify-1", "function", "clarify", "{\"missing\":\"DATES\"}"))).build(),
+        ChatGenerationMetadata.builder().finishReason("tool_calls").build()))));
+    when(ledger.recoverOperation(any())).thenReturn(new LedgerResult.Ok<>(Optional.empty()));
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory());
+        var validators = Validation.buildDefaultValidatorFactory()) {
+      var mapper = new TransactionMapper(validators.getValidator(),
+          Mappers.getMapper(TransactionRepresentationMapper.class));
+      var capture = capture();
+      capture.setConversation(new ConversationAssistant(provider, new PersonalOwner("personal"),
+          ledger, Clock.fixed(SOURCE, ZoneOffset.UTC), executor,
+          new LedgerTools(ledger, mapper), JsonMapper.builder().build()));
+      var event = update(9, "Cho tôi xem các khoản chi");
+      event.getMessage().getFrom().setFirstName("Mi\u202Enh\n{}");
+      event.getMessage().getFrom().setLastName("Nguye\u0302\u0303n");
+      capture.handle(event);
+      var sent = ArgumentCaptor.forClass(SendMessage.class);
+      verify(client).execute(sent.capture());
+      assertThat(sent.getValue().getText()).isEqualTo(
+          "Minh Nguyễn, Bạn muốn xem ngày hoặc khoảng thời gian nào?");
+      assertThat(sent.getValue().getParseMode()).isNull();
+      var prompt = ArgumentCaptor.forClass(Prompt.class);
+      verify(provider).call(prompt.capture());
+      assertThat(prompt.getValue().getInstructions()).noneMatch(message ->
+          message.getText() != null && (message.getText().contains("Minh Nguyễn")
+              || message.getText().contains("Nguyễn") || message.getText().contains("\u202E")));
+      var host = ArgumentCaptor.forClass(HostContext.class);
+      verify(ledger).recoverOperation(host.capture());
+      assertThat(host.getValue().principal()).isEqualTo("personal");
+      assertThat(host.getValue().interactionScope()).isEqualTo("tg:123:77");
+      var foreign = update(10, "Cho tôi xem các khoản chi");
+      foreign.getMessage().getFrom().setId(88L);
+      foreign.getMessage().getFrom().setFirstName("Minh Nguyễn");
+      capture.handle(foreign);
+      verify(provider, times(1)).call(any(Prompt.class));
+      verify(client, times(1)).execute(any(SendMessage.class));
+      verify(ledger, never()).create(any(), any());
+    }
+  }
+
+  @Test
   void fallbackReplyFailureRecoversOriginalWithoutSecondModelOrMutation() throws Exception {
     var provider = mock(ChatModel.class);
     when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());

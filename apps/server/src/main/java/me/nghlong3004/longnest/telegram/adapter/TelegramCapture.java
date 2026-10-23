@@ -159,7 +159,7 @@ public class TelegramCapture {
         && problem.code() != InterpretationResult.Code.INVALID_AMOUNT
         && problem.code() != InterpretationResult.Code.AMBIGUOUS_AMOUNT
         && problem.code() != InterpretationResult.Code.CONFLICTING_TYPE) {
-      return conversationReply(context, conversation.reply(context, text));
+      return conversationReply(context, conversation.reply(context, text), message.getFrom());
     }
     if (interpreted instanceof InterpretationResult.Problem problem) {
       send(message.getChat().getId(), replies.problem(problem));
@@ -425,9 +425,11 @@ public class TelegramCapture {
     return true;
   }
 
-  private boolean conversationReply(HostContext context, ConversationAssistant.Reply reply) {
+  private boolean conversationReply(HostContext context, ConversationAssistant.Reply reply,
+      User presentation) {
     if (reply.messageKey() != null) {
-      Message sent = send(settings.getUser(), replies.conversation(reply.messageKey()), null);
+      Message sent = send(settings.getUser(), replies.conversation(reply.messageKey(),
+          presentation.getFirstName(), presentation.getLastName()), null);
       if (conversationalReplies.size() >= 100) {
         conversationalReplies.remove(conversationalReplies.iterator().next());
       }

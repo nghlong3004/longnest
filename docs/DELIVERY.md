@@ -150,7 +150,7 @@ commit containing runtime material; private env files must stay excluded.
 
 | Target path | Intended role |
 | --- | --- |
-| `.env.example` | Optional committed documentation of variable names and nonsecret placeholders; not a runtime source and not created in this task. |
+| `.env.example` | Tracked-safe public template now exists at root with synthetic DB defaults, default-off integrations and commented private placeholders. Not a runtime source; copy to `.env.dev` only if absent, otherwise merge privately. |
 | `.env` | Proposed private local base; never commit or copy into docs. Not read by the implemented launcher. |
 | `.env.dev` | Private explicit backend-development values, loaded only by the dev launcher; never commit. Not a production loader. |
 

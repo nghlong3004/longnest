@@ -7,6 +7,142 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### CONVERSATION-POLISH-1 — ACCEPT provider-default output and presentation-only name
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns conversation configuration/prompt,
+narrow Telegram presentation/dispatch, affected tests/resources and public docs.
+Base: `199afb045f57850b594f14d5bc34841994e06254`, accepted server manifest
+`b698106aa4800cf4fed7c5940d3296f70fbe77b4d6009e15d7759d1ec7a436de`.
+Current room reconciled: same Lead, no active Peer writer or pending scope transfer;
+prior read-only Peer remains released. Existing `.env.example` and setup/status docs
+changes are preserved inputs, not recreated. Private env files are out of scope.
+
+Outcome: leave output tokens unset in native SDK options and serialized requests;
+provider/model defaults are variable/unknown, not unlimited or guaranteed cheaper.
+No replacement numeric cap or mapping of legacy DEEPSEEK_MAX_TOKENS. Keep single
+tool, concurrency/rate/deadlines/retry/default-off and no-live boundaries unchanged.
+Product is quick personal-finance capture/questions, not extended social chat;
+existing short bounded memory suffices. Authenticated Telegram first/last display
+name is sanitized/bounded in presentation only for localized clarification,
+never principal/scope/event/proof/tool input, model instructions or stored memory.
+No preferred-nickname setting, persistence or new context machinery is required.
+
+Acceptance: actual SDK in-process fixture must omit output-token fields; synthetic
+rendering/adapter checks prove bounded literal Unicode names, neutral fallback,
+unchanged numeric-user authorization and no new model-name egress. Offline package
+and isolated smoke, then stable candidate/disposition. After technical acceptance,
+related safe public env/docs plus this increment may be committed and normally
+pushed to the existing approved origin/main, after destination/identity/content
+checks. No runtime/provider/DB/Telegram/paid calls; no private env reads or edits.
+
+Stable Lead handoff/disposition: ACCEPT exact 107-file server manifest
+`ecb13ea051829f1a825b702b165f848c18f4944d0848e4ab007b0981d41a29b4`.
+Evidence root: `apps/server/target/conversation-polish-evidence/` (ignored generated
+evidence only); `candidate-server.sha256` and `candidate-server.tar.gz`, archive
+SHA-256 `324010c1b5629f50e26dd2ec92af87ae3936dbadad352b41dd9a752251ae4a32`.
+Related public `.env.example` reviewed at SHA-256
+`6a606e4b877e412f1d2f17db903b5342655040dfdc1fe5f83355a89500b2a7a9`:
+synthetic DB placeholders, integrations false, commented credential/user/model
+placeholders and no token-cap setting. Prior env/setup-doc work is included as
+explicitly authorized; private `.env`/`.env.dev` remain ignored and untouched.
+
+Verification: isolated environment, Java25.0.4.1/Maven3.10.0, offline existing cache,
+empty user/global Maven settings. `package.log`: **530 tests passed, zero failures/
+errors/skips** (baseline526 + four presentation/adapter tests). `smoke.log` exit0:
+non-web context, managed virtual-thread execution and closure. SDK in-process fake
+HTTP fixture verifies null maxTokens and absence of max_tokens/max_completion_tokens/
+max_output_tokens, while thinking remains disabled and eight tools/one request/
+direct rendering remain. No network socket/provider call is used by that fixture.
+Synthetic UI/adapter checks cover NFC/Unicode code-point bounds, control/bidi/markup
+removal, missing-label fallback, literal apostrophes, foreign-ID impersonation
+rejection, unchanged principal/scope and no display-name data in provider prompts.
+All original single-tool, memory, replay and actual-user control tests still pass.
+Initial focused run failed two test expectations (allowed digit retained; name
+substring also matched the timezone); assertions corrected, full package passed.
+
+Static checks: 21 Markdown documents/202 local targets, balanced fences, 108 unique
+Vietnamese keys, whitespace, ignore/tracking and private-file metadata unchanged.
+No new dependency, schema, HostContext field, nickname store or memory mechanism.
+Ledger services, tool callbacks, transport authorization, conversation memory and
+dev launcher source remain unchanged. Implementation/build writers are stopped;
+candidate writes are frozen pending any explicitly assigned repair. No Peer write
+assignment was opened. Existing compiler/Mockito/Lombok deprecation warnings remain.
+
+Complete related paths: `.env.example`; `apps/server/README.md`; server Java
+`conversation/ConversationConfiguration.java`, `conversation/ConversationAssistant.java`,
+`telegram/adapter/TelegramCapture.java`, `telegram/mapper/TelegramReplies.java`;
+`messages_vi.properties`; tests `ConversationConfigurationTests`, `UiMessagesTests`,
+`TelegramAdapterTests`; `docs/DECISIONS.md`, `docs/DELIVERY.md`, `docs/PRODUCT.md`,
+`docs/SERVICES.md`, `docs/WORK_STATUS.md`; `scripts/README.md`.
+
+Usable outcome: enabled native requests now defer output length to the configured
+provider/model; Telegram clarification may use the authenticated sender's sanitized
+first/last name, e.g. `Minh Nguyễn, Bạn muốn xem ngày hoặc khoảng thời gian nào?`.
+Names stay local to presentation, with neutral fallback; pages/receipts/proofs are
+unchanged. Quick capture/questions and existing short memory are sufficient;
+read-only multi-tool batches remain deferred, not selected by this change.
+Actual provider-default length/cost/latency are unknown and variable, not unlimited
+or necessarily cheaper. Live language quality, PostgreSQL durability and Telegram
+runtime behavior remain unverified; default-off/live/paid/egress authority unchanged.
+Configured identity/main/origin/origin-main were inspected for the authorized Git
+publication; exact commit/push outcome follows without a status-only commit loop.
+
+### Environment preparation — completed 2026-10-23, local only
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns this bounded `.env`/`.env.example`
+and setup-docs change. Explicit private `.env` edit authority applies only here;
+no broader private-file, runtime, credential-value or provider authority follows.
+Created public root `.env.example` solely from public configuration: current
+Compose synthetic DB defaults, required backend names, `ledger` profile, both
+integrations false, exact DeepSeek base URL and commented token/user/key/model
+placeholders. No private value was copied into the example or any project artifact.
+
+Root `.env` was mechanically prepared with opaque value preservation. Only four
+unambiguous key names were normalized: DB_USERNAME/DB_PASSWORD to the corresponding
+SPRING_DATASOURCE names; DEEPSEEK_API_KEY/DEEPSEEK_MODEL to LONGNEST_DEEPSEEK names.
+Every original assignment suffix/value and unrelated line is unchanged. Existing
+identity/enablement choices and file mode remain; absent supported settings use
+public synthetic defaults or commented optional placeholders. Legacy DB_URL and
+DEEPSEEK_BASE_URL remain unchanged because their formats cannot be established
+from names alone; DEEPSEEK_MAX_TOKENS has no native setting and is also retained.
+Any former output cap belongs to its historical code snapshot; the current
+CONVERSATION-POLISH-1 change leaves it unset without altering private comments or
+values. New settings are not a claim that the private file is runtime-ready.
+
+Verification: names-only inspection, opaque byte/assignment preservation guards,
+single-link regular target/mode check, synthetic collision/duplicate/quoting tests
+and idempotence passed. Initial synthetic idempotence failure was corrected before
+any private write. `.env.dev` contents were never read or edited; inode/size/time/
+mode metadata matched before/after. `.env` and `.env.dev` remain ignored/untracked;
+the safe example is nonignored/untracked until an explicitly requested Git action.
+No private values/diffs were emitted. Static example/format/ignore checks only;
+no build, startup, DB/Telegram/provider/network/paid action, stage, commit or push.
+Launcher still reads only `.env.dev`; `.env` and `.env.example` are not auto-loaded.
+Setup docs now link the example; prior implementation/evidence stays unchanged.
+
+### Git publication — completed 2026-10-23
+
+Explicit destination authority: `git@github.com:nghlong3004/longnest.git`.
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` verified configured identity
+`Long <nghlong3004@gmail.com>`, current branch `main` and HEAD
+`199afb045f57850b594f14d5bc34841994e06254`. No prior remote/upstream; only the
+intentional post-commit WORK_STATUS note was dirty and nothing was staged.
+All five reachable commits/217 unique blobs (2,729,483 bytes) were inspected for
+private/generated paths and known credential-like literals; none were flagged.
+No private files or dangling objects were included in the pushed branch history.
+Pattern checks are not a guarantee that every possible secret format is detected.
+
+Existing SSH access succeeded without credential/host-permission changes.
+The destination initially advertised no refs. Added `origin` at the exact approved
+SSH URL, then ordinary non-force `git push --set-upstream origin main:main`
+succeeded as a new branch. Independent `git ls-remote origin refs/heads/main`
+confirmed `199afb045f57850b594f14d5bc34841994e06254`; upstream is `origin/main`,
+local tracking comparison is 0 ahead/0 behind. No other branch/tag was pushed,
+history rewritten, deployment performed or runtime/provider activated.
+Earlier no-remote/no-push statements below describe their historical checkpoints.
+This publication/outcome note remains intentionally local and uncommitted; no
+documentation-only commit loop. Accepted source and its existing evidence unchanged.
+
 ### NATIVE-AI-1 — ACCEPT native conversation, synthetic/local only
 
 Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns the stable integrated candidate,
@@ -116,6 +252,13 @@ push or remote/destination guess. Existing configured identity/main/no remote or
 upstream verified for the local commit. No other code assignment is left active.
 
 Complete change set (A added, M modified, D removed):
+
+Committed locally as `199afb045f57850b594f14d5bc34841994e06254` —
+`Replace bespoke interpretation with native Spring AI conversation`, parent
+`b100fbeadbe282b6cfc392c8686bab3a415f2c33`. All 51 inspected staged/live paths
+matched; whitespace/excluded-path/credential-like-literal checks passed. No push,
+remote or upstream. Tree was clean after commit; only this post-commit outcome
+record is intentionally unstaged. No documentation-only commit/amend loop.
 
 ```text
 M	AGENTS.md
