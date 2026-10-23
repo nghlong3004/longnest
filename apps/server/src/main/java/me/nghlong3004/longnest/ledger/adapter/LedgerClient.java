@@ -50,6 +50,10 @@ public class LedgerClient {
     return call(context, true, () -> transactions.create(context));
   }
 
+  public LedgerResult<Optional<MutationReceipt>> recoverCreateIfPresent(HostContext context) {
+    return call(context, true, () -> transactions.recoverCreateIfPresent(context));
+  }
+
   public LedgerResult<List<String>> pendingCreates(HostContext context, String operationPrefix) {
     return call(context, false, () -> transactions.pendingCreates(context, operationPrefix));
   }

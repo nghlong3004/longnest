@@ -31,7 +31,7 @@ import me.nghlong3004.longnest.input.InterpretationResult.Ready;
 import me.nghlong3004.longnest.input.InterpretationResult.Status;
 
 /** Stateless finite-grammar interpreter. Host date, identity and persistence remain outside it. */
-public final class TransactionInterpreter {
+public final class TransactionInterpreter implements InputInterpreter {
   private static final String EXAMPLE = "-45k đồ dùng";
   private static final Map<String, Category> PHRASES =
       Map.ofEntries(

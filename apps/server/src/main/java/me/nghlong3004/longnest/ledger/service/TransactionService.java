@@ -1,6 +1,7 @@
 package me.nghlong3004.longnest.ledger.service;
 
 import java.util.List;
+import java.util.Optional;
 import me.nghlong3004.longnest.ledger.dto.MutationReceipt;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
 import me.nghlong3004.longnest.ledger.dto.ControlBinding;
@@ -48,6 +49,15 @@ public interface TransactionService {
    * @throws LedgerException for forbidden/missing data, invalid context or generation overflow
    */
   MutationReceipt create(HostContext context);
+
+  /**
+   * Recovers a frozen create before a host repeats nondeterministic interpretation.
+   *
+   * @param context trusted principal and original event operation identity
+   * @return empty only when no create intent exists; otherwise its committed original receipt
+   * @throws LedgerException for invalid/foreign context, conflicting controls or storage failure
+   */
+  Optional<MutationReceipt> recoverCreateIfPresent(HostContext context);
 
   /**
    * Authorizes and persists a field prompt for an owned active revision, without mutation.

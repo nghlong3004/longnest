@@ -130,6 +130,20 @@ public class TransactionServiceImpl implements TransactionService {
   }
 
   @Override
+  public Optional<MutationReceipt> recoverCreateIfPresent(HostContext context) {
+    String principal = owner.authorize(context);
+    mapper.validateOperation(context);
+    store.lockHead(principal);
+    if (store.controlByRequest(principal, context.operationId()).isPresent()
+        || store.controlEventFingerprint(principal, context.operationId()).isPresent()) {
+      throw conflict();
+    }
+    // Same class-level transaction owns both lookup and optional create/recovery.
+    return store.inbox(principal, context.operationId()).isEmpty()
+        ? Optional.empty() : Optional.of(create(context));
+  }
+
+  @Override
   public FieldPrompt openFieldPrompt(HostContext context, String id, String revision,
       EditField field, String previousActionId) {
     String principal = owner.authorize(context);

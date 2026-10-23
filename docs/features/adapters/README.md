@@ -1,20 +1,30 @@
 # Later adapters — A1 LLM and A2 web
 
-Both are future scope, not prerequisites for current CRUD, daily budget or salary
-advice. [Services](../../SERVICES.md) owns typed capabilities/tool mappings;
+A1 has a bounded capture implementation; broader A1/A2 remain later scope, not
+prerequisites for current CRUD, daily budget or salary advice.
+[Services](../../SERVICES.md) owns typed capabilities/tool mappings;
 [Domain](../../DOMAIN.md#input-to-normalized-contract) owns the normalized boundary;
 [C4](../../ARCHITECTURE.md) owns architecture. Do not copy financial rules here.
-No accepted implementations exist and no Peer is assigned.
+DS-FALLBACK-1 implements the bounded A1 capture subset under CURRENT STATUS;
+no Peer is assigned. A2 and a general model tool/intent dispatcher do not exist.
 
 The deterministic ledger's L1–L3 code now has bounded synthetic/local acceptance;
 see CURRENT STATUS for exact artifacts and the remaining PostgreSQL/live evidence.
 The shared create/get/recent/edit-preview/Save/Delete/Restore and range boundaries
 are implemented inputs for later adapter work, not permission to activate a model.
-Provider/endpoint/privacy/cost and rules-first-versus-replacement decisions remain
-specific to that future integration; settled money/date/auth/confirmation behavior
+Rules-first DeepSeek fallback is selected; live endpoint/model/privacy/cost remain
+specific unresolved decisions; settled money/date/auth/confirmation behavior
 is not reopened. No model may manufacture the host-only Save/Delete/Cancel proof.
 
 ## A1 — future LLM interpretation through accepted capabilities
+
+Current bounded implementation uses existing Spring AI DeepSeek 2.0.1, not a
+handwritten provider HTTP client, and is disabled by default. Only safe
+UNKNOWN_PHRASE capture can be interpreted; money/source/type evidence and the same
+rules validate the JSON result. Frozen create recovery precedes another provider
+attempt. No natural-language date/query/edit/delete dispatcher or model tools are
+installed. See [server configuration/limits](../../../apps/server/README.md#opt-in-deepseek-capture-fallback).
+Proposals below describe broader A1, not claims those capabilities now exist.
 
 **Outcome/examples:** user supplies complete phrasing outside current grammar; a
 future authorized interpreter proposes the same typed request and presents the
@@ -23,8 +33,8 @@ service result. Missing amount/type clarifies. Given host business date 2026-10-
 Delete remains request → displayed target → actual user proof → host-only commit.
 
 **Required inputs:** exact accepted L1–L3/services candidate plus Human approval for
-provider, cost and privacy/external transmission. Choose rules-first fallback OR
-interpreter replacement; this is not a required pair of runtime integrations.
+provider, cost and privacy/external transmission before live execution. Rules-first
+fallback is selected for the bounded implementation; replacement is not selected.
 Budget/allocation tools may be exposed only after their own service is accepted.
 
 **Provisional scope:** bounded interpreter/tool adapter, routing and contract tests,
@@ -38,8 +48,8 @@ strategy; no such decision authorizes money movement or direct persistence.
 
 ### Candidate and minimal OOP path — proposals
 
-DeepSeek is the preferred **candidate under consideration**, not an approved
-integration. See [source-backed LifeOS/DeepSeek findings](../../research/LIFEOS.md).
+DeepSeek is selected for implementation, not approved live execution or egress.
+See [source-backed LifeOS/DeepSeek findings](../../research/LIFEOS.md).
 Reuse LifeOS routing, bounded-result and egress-policy concepts, not its runtime,
 hooks, memory, CLI subprocess or provider trust rules. No separate agent platform.
 
@@ -61,7 +71,7 @@ to an approved future provider. Known invalid business values are not “repaire
 by a model. Interpreter replacement remains an alternative using identical typed
 contracts, tools and safeguards; it changes text routing/egress/latency/coverage,
 not financial logic. Buttons and explicit query/delete confirmations still route
-directly. Neither route is implemented; current release remains deterministic.
+directly. Bounded capture fallback is implemented; replacement is not.
 
 Minimize egress to the relevant utterance/business reference and necessary selected
 record fields, not the ledger/history. Propose one completed interpretation and at
@@ -105,7 +115,8 @@ selected PE1/PE2 contracts for tested actions. For provider trials Human must ch
 direct versus third-party host, accept applicable terms/synthetic egress, authorize
 credentials and hard cost/request/latency limits; Lead selects exact endpoint/model/
 schema and retry policy. Real-data use needs separate privacy/retention/region
-clarification and approval. No evaluation, code, SDK, key or API call exists now.
+clarification and approval. Fake-response evaluation/code now exists; no provider
+evaluation, credential use or API call has been performed.
 
 ## A2 — later visual web path to the same ledger
 

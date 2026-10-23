@@ -99,6 +99,14 @@ No token, user identity, live startup or Telegram message has been configured he
 
 ## Exact loading contract and precedence
 
+The same literal loader also supports the optional `LONGNEST_DEEPSEEK_ENABLED`,
+`LONGNEST_DEEPSEEK_API_KEY`, `LONGNEST_DEEPSEEK_BASE_URL` and
+`LONGNEST_DEEPSEEK_MODEL` names. No values are provided or private file edited here.
+The [server fallback documentation](../apps/server/README.md#opt-in-deepseek-capture-fallback)
+defines required settings, timeout/recovery limits and separate live egress/spend
+approval. Omission keeps deterministic interpretation; this launcher grants no
+provider permission. Compose does not consume or forward these names.
+
 Low → high: existing application defaults → literal `.env.dev` values → already
 exported process environment. An exported empty value wins, so an empty required
 value fails rather than falling back. `.env` is **never read**; no base/dev merge,

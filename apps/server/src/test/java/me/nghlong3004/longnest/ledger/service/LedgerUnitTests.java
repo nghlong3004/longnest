@@ -96,6 +96,38 @@ class LedgerUnitTests {
   }
 
   @Test
+  void absentFrozenCreateRecoveryDoesNotMutateOrHideStorageFailure() {
+    assertThat(transactions.recoverCreateIfPresent(HOST)).isEmpty();
+    verify(store, never()).insert(any(), any(), any(), any());
+    verify(store, never()).freeze(any());
+    when(store.lockHead("personal")).thenThrow(new LedgerException(LedgerException.Code.NOT_SAVED));
+    fails(() -> transactions.recoverCreateIfPresent(HOST), LedgerException.Code.NOT_SAVED);
+  }
+
+  @Test
+  void frozenReceiptRecoveryPrecedesReinterpretationAndNeverUsesCurrentEntry() {
+    var frozen = pending();
+    var completed = new LedgerStore.Inbox(frozen.owner(), frozen.operationId(),
+        frozen.fingerprint(), frozen.intent(), frozen.businessReference(), frozen.messageAt(),
+        Optional.of(new LedgerStore.Receipt(42, 9, TransactionMapper.micros(REFERENCE))));
+    when(store.inbox("personal", "event-1")).thenReturn(Optional.of(completed));
+    var recovered = transactions.recoverCreateIfPresent(HOST).orElseThrow();
+    assertThat(recovered.replayed()).isTrue();
+    assertThat(recovered.transaction().amountMinor()).isEqualTo("45000");
+    verify(store, never()).insert(any(), any(), any(), any());
+    verify(store, never()).entry(any(), anyLong());
+  }
+
+  @Test
+  void frozenRecoveryRejectsForeignActorAndConflictingControlIdentity() {
+    fails(() -> transactions.recoverCreateIfPresent(new HostContext("foreign", "event-1",
+        REFERENCE, REFERENCE)), LedgerException.Code.NOT_FOUND_OR_FORBIDDEN);
+    verifyNoInteractions(store);
+    when(store.controlEventFingerprint("personal", "event-1")).thenReturn(Optional.of("control"));
+    fails(() -> transactions.recoverCreateIfPresent(HOST), LedgerException.Code.IDEMPOTENCY_CONFLICT);
+  }
+
+  @Test
   void everyServiceAuthorizesBeforeStoreOrInputInspection() {
     Mockito.reset(store);
     var foreign = new HostContext("foreign", "other", REFERENCE, null);

@@ -22,7 +22,9 @@ public sealed interface InterpretationResult {
     AMBIGUOUS_AMOUNT,
     CONFLICTING_TYPE,
     INVALID_AMOUNT,
-    INVALID_FIELD
+    INVALID_FIELD,
+    MODEL_CLARIFICATION,
+    INTERPRETER_UNAVAILABLE
   }
 
   record Ready(TransactionDraft draft) implements InterpretationResult {

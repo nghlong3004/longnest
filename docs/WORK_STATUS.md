@@ -7,6 +7,150 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### DS-FALLBACK-1 — ACCEPT default-off capture interpretation, synthetic/local only
+
+Explicit continuation selects deterministic rules first, DeepSeek fallback only;
+no replacement parser, live/provider calls, credentials, egress or spending is
+authorized. Lead `8442a05c-6421-45c4-adc7-65b64111c30f` owns this bounded scope;
+existing Peer assignments remain closed/idle, no dispatch or additional session.
+Base: local commit `4a570246e6b9585287587a5642f2e72a43e8050b`, accepted 97-file
+server manifest `cb35c199f201c434418d8dc515b2c88279253b3fe2615914de5643f96308cfeb`.
+The only pre-existing working-tree change is this baseline outcome record.
+
+Outcome: opt-in capture interpretation through the existing Spring AI DeepSeek
+2.0.1 binding, strict typed JSON/local rules revalidation, trusted-event recovery
+before repeat interpretation, Vietnamese clarification/errors, synthetic tests
+and local build. Scope: input boundary/provider/config, narrow frozen-create
+recovery service/client path, Telegram injection/capture, affected tests/resources
+and minimal canonical documentation. Existing explicit controls bypass the model;
+no model tools, ledger arithmetic, owner/proof fields or new finance flows.
+Eligibility will be conservative: UNKNOWN_PHRASE only, not rejected/ambiguous/
+missing-fact/unsupported currency, debt/transfer or relative-date paths. Capture
+only; no natural-language query/edit/date/action dispatcher in this increment.
+Provider client construction and requests default off, including init/smoke.
+Live endpoint/model, data/privacy terms and spend/request authority remain separate
+operator decisions. PostgreSQL/Telegram/R1–R17 remain unverified and are not a
+prerequisite to this independent synthetic implementation. Exact candidate,
+verification, complete paths and disposition follow after review.
+
+Lead writer handoff/review: all implementation/build writers stopped, no Peer
+assignment reopened. ACCEPT the exact 102-file server manifest
+`8f5240edcec13091c8b7754ff3d6f6262e9dd25893b25e0ff8b9e0afeaaa12b4`
+from the baseline above. Frozen source manifest/archive:
+`/tmp/longnest-deepseek-lead.rouHbW/candidate-server.sha256` and
+`candidate-server.tar.gz`; archive SHA-256
+`47f22bdcf8e569404b88f1b0fe9402e456b003b383e408030879b5b8e50d4ce7`.
+All source hashes were rechecked after build/smoke. This accepts code/configuration,
+fake-model/SDK handling and local packaging, not live interpretation or R1–R19.
+
+Implemented: InputInterpreter with unchanged default rules, a cohesive rules-first
+DeepSeekInterpreter and opt-in InputConfiguration. Existing Spring AI starter/BOM
+2.0.1 are reused; POM, dependencies, schema and money/date/financial controls are
+unchanged. Official [Spring AI compatibility](https://docs.spring.io/spring-ai/reference/getting-started.html)
+lists Boot4.1 support; its [DeepSeek binding](https://docs.spring.io/spring-ai/reference/api/chat/deepseek-chat.html)
+and [DeepSeek JSON guide](https://api-docs.deepseek.com/guides/json_mode/)
+support the selected manual SDK/JSON-object route, not arbitrary JSON-schema
+guarantees. [Thinking documentation](https://api-docs.deepseek.com/guides/thinking_mode/)
+requires explicitly disabling its current default; actual SDK serialization is
+verified by the in-process mock HTTP fixture, without a socket/provider call.
+
+Eligibility: only UNSUPPORTED/UNKNOWN_PHRASE, one locally exact amount, one
+noncontradictory supported type cue and conservative lexical checks. Known invalid,
+ambiguous/missing-fact, negated/hypothetical, foreign-currency, debt/transfer,
+relative-date and command routes stay local. Model JSON must have exactly four
+string fields and one completed choice; no extra/duplicate fields, tool calls,
+trailing JSON or truncated response. Canonical draft reuses the deterministic
+parser, exact local amount and literal source/type/note evidence. Unsupported
+semantics clarify; this finite evidence policy cannot prove general language
+understanding or prompt-injection safety. Category may remain uncategorized.
+
+Authenticated capture recovers a frozen create/original receipt before another
+provider interpretation. A storage failure stops it, not an empty-success guess.
+This uses the same inbox and transactional service proxy: pending creates can
+finish, completed originals replay, no model-owned ID/context/proof and no open
+database transaction during inference. Existing direct typed ingest retains
+changed-payload conflicts; distinct trusted events remain distinct purchases.
+No model query/edit/date/Delete/Save/Cancel dispatcher or generic tools were added.
+
+Configuration: LONGNEST_DEEPSEEK_ENABLED defaults false; explicit API_KEY, BASE_URL
+and MODEL with that same prefix are required when enabled. Only the direct HTTPS
+DeepSeek base URL is accepted, redirects disabled, no implicit model/endpoint
+selection or third-party route. Init/smoke exclude the provider factory even with
+inherited enablement. Existing root-env launcher loads these names literally with
+inherited-env precedence; no private file was read/edited. JSON-object/non-thinking,
+512 output tokens, one attempt/no retry/provider switch; connect2/read8/overall10
+seconds with deadline cancellation and preserved interruption. Existing Boot-managed
+execution is reused. No prompts, notes, secrets, response bodies or exception text
+are logged by new app code; upstream prompt-bearing warnings are explicitly off.
+Two new Vietnamese resource messages cover clarification/provider failure.
+
+Verification: Temurin Java25.0.4.1/Maven3.10.0/Linux WSL2. Final offline package
+with isolated environment/explicit empty user+global Maven settings passed
+**526 tests, zero failures/errors/skips**, versus accepted baseline473 (+53).
+Standalone isolated smoke exit0: non-web context, managed virtual-thread execution,
+normal closure. Logs in the frozen directory: `package-accepted.log`, `smoke.log`.
+The executable JAR includes the input boundary, SDK2.0.1 and generated mapper;
+no smoke YAML/test launcher. Static checks: 21 public Markdown files/198 local
+targets, balanced fences, 95 unique Vietnamese keys, changed-file diff whitespace
+check clean. No Java/Maven/background writer remains. No runtime DB/Telegram/LLM,
+paid/provider request, private-state access or deployment occurred.
+
+Retained intermediate evidence: focused-second.log (39 passing), focused-third.log
+(156 passing), package.log (521 passing before final guard expansion).
+focused-initial.log records a compile failure from Spring7's boolean error-handler
+signature; production handler corrected. package-final.log records one fixture
+assertion failure (unused tool callbacks are null); sdk-focused.log records one
+fixture predicate mistake (shouldRetry is not the retry counter). Final checks use
+null-or-empty tool assertions, execute/count a failing local retry to prove one
+attempt, and encode/decode actual SDK JSON through MockRestServiceServer. No failed
+result was treated as acceptance. Existing Mockito/Unsafe warnings remain nonfatal.
+
+Complete changed paths (five added Java/test files; all others modified, none removed):
+
+```text
+AGENTS.md
+README.md
+apps/server/README.md
+apps/server/src/main/java/me/nghlong3004/longnest/input/InputInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/DeepSeekInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/InputConfiguration.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/InterpretationResult.java
+apps/server/src/main/java/me/nghlong3004/longnest/input/TransactionInterpreter.java
+apps/server/src/main/java/me/nghlong3004/longnest/ledger/adapter/LedgerClient.java
+apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/TransactionService.java
+apps/server/src/main/java/me/nghlong3004/longnest/ledger/service/impl/TransactionServiceImpl.java
+apps/server/src/main/java/me/nghlong3004/longnest/telegram/adapter/TelegramCapture.java
+apps/server/src/main/java/me/nghlong3004/longnest/telegram/config/TelegramConfiguration.java
+apps/server/src/main/resources/application.yaml
+apps/server/src/main/resources/messages_vi.properties
+apps/server/src/test/java/me/nghlong3004/longnest/input/DeepSeekInterpreterTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/input/InputConfigurationTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/ledger/service/LedgerUnitTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/telegram/TelegramAdapterTests.java
+apps/server/src/test/java/me/nghlong3004/longnest/telegram/config/TelegramLifecycleTests.java
+docs/ARCHITECTURE.md
+docs/DECISIONS.md
+docs/PRODUCT.md
+docs/SERVICES.md
+docs/WORK_STATUS.md
+docs/features/adapters/README.md
+docs/research/LIFEOS.md
+scripts/README.md
+```
+
+Disposition limits/next outcome: default remains usable rules code; eligible prose
+can reach a bounded validated draft/clarification through fake-provider boundaries.
+Actual DeepSeek accuracy/latency/availability is unmeasured. Operator still owns
+live endpoint/model selection, permitted data, applicable privacy/retention/region/
+training terms, private credential custody and monetary/session request limits;
+one request/512 tokens is not a monetary budget and cancellation does not prove no
+charge. The next provider outcome is a separately authorized synthetic-only
+quality/cost trial, not a new deterministic ledger feature gate. PostgreSQL and
+live Telegram readiness remain independently unverified. Broader natural-language
+queries/dates/action dispatch are intentionally outside this bounded capture scope.
+Existing Git authority permits a reviewed local increment with the coherent
+configured identity/main branch; no remote exists, so no push/destination guess.
+
 This section supersedes the historical docs-only authority/ownership below.
 Lead `8442a05c-6421-45c4-adc7-65b64111c30f` owns root/shared docs, ignore rules,
 Git staging/commits and integration/acceptance. Recovery confirmed duplicate Lead
@@ -48,10 +192,18 @@ Staged whitespace review reports existing mixed space/tab indentation in the
 accepted POM; retained rather than changing the verified source for this commit.
 Product wording now distinguishes implemented application contracts from unverified
 runtime behavior and absent HTTP APIs; historical per-increment Git facts remain.
-Disposition: accepted local baseline prepared for staged-diff review and commit;
-the resulting hash/outcome will be recorded here after the single baseline commit,
-without a documentation-only follow-up commit loop. PostgreSQL/live Telegram and
-release R1–R17 evidence remain outstanding; no runtime acceptance is added.
+Disposition: ACCEPT BASELINE-1 local root commit on `main`,
+`4a570246e6b9585287587a5642f2e72a43e8050b` —
+`Establish deterministic ledger and Telegram adapter baseline`.
+122 files, 16,534 inserted lines; complete staged inventory/diff reviewed, with no
+credential-pattern matches or excluded/private/generated paths. Git's index matches
+public files, allowing only automatic CRLF normalization in the existing skill and
+root ignore file; protected guidance on disk was not edited. Working tree was clean
+immediately after commit. This post-commit outcome record is intentionally the only
+uncommitted file change; no documentation-only follow-up commit/amend or history
+rewrite. No push: no configured remote/upstream and no destination guessed.
+PostgreSQL/live Telegram and release R1–R17 evidence remain outstanding; no runtime
+acceptance is added.
 
 The project backend skill now exists and was read; it was externally/manually
 created after the prior snapshot. Preserve it unchanged. `.agents` now observes
@@ -596,12 +748,13 @@ migration/init/runtime scope, private DataSource/owner config, then separately
 authorized Telegram token/user activation and actual UX checks. Do not send secrets
 in chat. Backup/custody/retention decisions remain operational, no purge is approved.
 
-Future LLM-specific decisions remain strategy (rules-first fallback or replacement),
-provider/endpoint/model and privacy/egress/retention/cost/latency limits, private
-credential custody and separately authorized synthetic interpretation evaluation.
-Typed application capabilities are present, but no model/tool dispatcher/provider
-or generic agent framework is implemented or activated. Real-user Save/Delete/
-Cancel proof remains host-only. No DB/container/live Telegram/provider/paid/
+Rules-first DeepSeek capture is now selected for DS-FALLBACK-1; replacement is not.
+Live endpoint/model, privacy/egress/retention/cost limits and private credential
+custody remain unresolved. Fake-provider checks do not establish provider quality
+or authorize even synthetic outbound trials. Typed application capabilities remain
+present; no general model/tool dispatcher or agent framework is implemented or
+activated. Real-user Save/Delete/Cancel proof remains host-only.
+No DB/container/live Telegram/provider/paid/
 deployment/private-env action was performed. Further runtime work waits for that
 specific authority/input, not another ledger-product decision.
 

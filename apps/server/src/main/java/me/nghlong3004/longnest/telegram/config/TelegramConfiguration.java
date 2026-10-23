@@ -6,7 +6,7 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.concurrent.Executors;
-import me.nghlong3004.longnest.input.TransactionInterpreter;
+import me.nghlong3004.longnest.input.InputInterpreter;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
 import me.nghlong3004.longnest.ledger.model.PersonalOwner;
@@ -41,7 +41,8 @@ public class TelegramConfiguration {
   @Bean
   TelegramLifecycle telegramLifecycle(TelegramSettings settings, PersonalOwner owner,
       TransactionMapper mapper, LedgerClient ledger, Clock clock, UiMessages messages,
-      ControlProofs proofs, @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor) {
+      ControlProofs proofs, InputInterpreter interpreter,
+      @Qualifier("applicationTaskExecutor") AsyncTaskExecutor executor) {
     // SDK uses Jackson 2 internally; Boot's Jackson 3 bean is untouched.
     var http = new OkHttpClient.Builder().connectTimeout(Duration.ofSeconds(5))
         .readTimeout(Duration.ofSeconds(35))
@@ -58,7 +59,7 @@ public class TelegramConfiguration {
           }
         }).build();
     TelegramClient client = new OkHttpTelegramClient(http, settings.getToken());
-    var capture = new TelegramCapture(client, settings, owner, new TransactionInterpreter(),
+    var capture = new TelegramCapture(client, settings, owner, interpreter,
         mapper, ledger, new TelegramReplies(messages), clock,
         new TelegramNavigation(clock, new SecureRandom()), proofs);
     var scheduler = Executors.newSingleThreadScheduledExecutor(

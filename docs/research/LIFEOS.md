@@ -1,5 +1,12 @@
 # LifeOS reuse and DeepSeek — bounded candidate research
 
+Historical research snapshot below. Subsequent DS-FALLBACK-1 selects rules-first
+DeepSeek capture code using the already present Spring AI 2.0.1 binding; live
+activation/egress/spend remain unapproved. Current implementation and evidence are
+in [WORK_STATUS](../WORK_STATUS.md) and the
+[adapter contract](../features/adapters/README.md); older unselected/no-code wording
+below describes the research date, not the current implementation state.
+
 Reviewed 2026-10-21: exact requested repository
 [danielmiessler/LifeOS](https://github.com/danielmiessler/LifeOS), public main-branch
 README and the linked skill/getting-started/security files below. Branch content is

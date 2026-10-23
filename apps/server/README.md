@@ -9,6 +9,73 @@ API dependency is now declared using the existing 1.6.3 version property; proces
 and Lombok binding configuration is unchanged. No existing dependency version
 changed. Docker/container execution is not part of this verification.
 
+## Opt-in DeepSeek capture fallback
+
+`InputInterpreter` is the reusable draft/clarification boundary. Normal ledger
+wiring selects the existing rules. `LONGNEST_DEEPSEEK_ENABLED=true` selects rules
+first plus `DeepSeekInterpreter`; init/smoke cannot construct this provider binding.
+The existing `org.springframework.ai:spring-ai-starter-model-deepseek` and BOM
+2.0.1 are reused, with no POM/dependency change or handwritten provider HTTP codec.
+[Spring AI compatibility](https://docs.spring.io/spring-ai/reference/getting-started.html)
+documents Boot 4.0/4.1 support; [DeepSeek integration](https://docs.spring.io/spring-ai/reference/api/chat/deepseek-chat.html)
+documents the selected `DeepSeekApi`/`DeepSeekChatModel` manual binding. Actual
+Java25/Boot4.1.1 local evidence belongs in CURRENT STATUS, not these documentation claims.
+
+This increment interprets **single capture only**, not natural-language queries,
+dates, edits or model tools. Only `UNSUPPORTED/UNKNOWN_PHRASE` with one exact locally
+parseable amount and conservative lexical safety checks is eligible. Ready,
+rejected, missing-fact, ambiguous, conflicting, relative-date, debt/transfer and
+explicit-command paths never reach the model. Spelled units nghìn/ngàn/triệu may
+normalize locally; bare 45 remains 45 dong. Unsafe or unsupported syntax stays local.
+No general natural-language safety or prompt-injection guarantee is claimed.
+
+Model output has exactly four string fields: `status`, `canonicalText`,
+`amountEvidence`, `typeEvidence`. CREATE is re-parsed with the existing rules;
+the amount must equal locally extracted evidence and its original substring.
+The note must occur in the source text; explicit type cues must agree. Unknown/
+duplicate fields, arrays/tools, extra JSON, truncation, missing/conflicting facts,
+or a CLARIFY result cannot save. Original source categories are not invented;
+the ordinary rules may retain UNCATEGORIZED. For example, synthetic
+`Mình vừa trả 45 nghìn cho bữa trưa.` can yield `-45000 bữa trưa` (uncategorized).
+This is a fake-response example, not measured DeepSeek language accuracy.
+
+Authentication/commands/field prompts precede interpretation. The host checks
+`requiresRecovery(text)` and calls `LedgerClient.recoverCreateIfPresent(context)`
+**before** eligible fallback. Existing frozen intent/receipt is authoritative,
+including after failed delivery/restart; no second model call or fresh purchase.
+Unavailable storage stops interpretation. New drafts pass the same validated
+ingest/create service; success is rendered only after its transaction proxy returns.
+No database transaction is held during the provider call. Other adapters must
+follow this recovery rule and supply their own trusted event context, never model IDs.
+
+After separate live approval only, privately inject these names (no values here):
+
+- `LONGNEST_DEEPSEEK_ENABLED`: default false, explicit true opts into code routing.
+- `LONGNEST_DEEPSEEK_API_KEY`: required private credential when enabled.
+- `LONGNEST_DEEPSEEK_BASE_URL`: required; this binding accepts only
+  `https://api.deepseek.com`, no redirects or third-party destinations.
+- `LONGNEST_DEEPSEEK_MODEL`: required explicit model identifier, no default alias.
+
+Root `.env.dev` loading through `bash scripts/dev-server.sh` and inherited-env
+precedence already apply to these names; direct Spring startup does not read that
+file. No private env file was inspected/changed. Keep `spring.ai.model.chat=none`:
+the dedicated factory owns its default-off binding, not automatic generic model routing.
+Configuration is not permission for egress/spend. Live route/model, permitted data,
+privacy/retention/region/terms, credential custody and monetary/session request
+limits still require explicit decisions. This binding sends only one bounded
+utterance and fixed instructions, no owner, Telegram identity, history or ledger.
+
+Requests use JSON-object mode, explicitly disabled thinking, maximum 512 output
+tokens, no tools/streaming or automatic retry (one attempt per interpretation).
+Connect timeout is 2 seconds, HTTP read timeout 8 seconds, overall caller deadline
+10 seconds with cancellation on timeout/interruption. No auth/balance/429/invalid
+output retry or provider switch. Cancellation does not prove the provider did not
+charge a request; token/request bounds are not a monetary budget. Busy/runtime
+failures return externalized Vietnamese clarification, never narrated success.
+The upstream model's malformed-response logger is disabled because it can include
+prompts; no app prompt/response/exception-body logs or tracing is added. Do not enable
+wire/body debugging or prompt-capturing observation in a live configuration.
+
 ## Build and safe smoke
 
 From `apps/server`, with Java 25 and Maven 3.10.0 available:

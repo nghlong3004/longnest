@@ -12,7 +12,7 @@ import java.util.function.BooleanSupplier;
 import java.util.function.Function;
 import lombok.RequiredArgsConstructor;
 import me.nghlong3004.longnest.input.InterpretationResult;
-import me.nghlong3004.longnest.input.TransactionInterpreter;
+import me.nghlong3004.longnest.input.InputInterpreter;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.dto.LedgerResult;
 import me.nghlong3004.longnest.ledger.dto.ConfirmationRequired;
@@ -50,7 +50,7 @@ public class TelegramCapture {
   private final TelegramClient client;
   private final TelegramSettings settings;
   private final PersonalOwner owner;
-  private final TransactionInterpreter interpreter;
+  private final InputInterpreter interpreter;
   private final TransactionMapper mapper;
   private final LedgerClient ledger;
   private final TelegramReplies replies;
@@ -137,6 +137,15 @@ public class TelegramCapture {
         return true;
       }
       return sendPreview(context, preview);
+    }
+    if (interpreter.requiresRecovery(text)) {
+      var recovery = ledger.recoverCreateIfPresent(context);
+      if (recovery instanceof LedgerResult.Failure<Optional<MutationReceipt>> failure) {
+        return respondReceipt(context, new LedgerResult.Failure<>(failure.code(),
+            failure.operationId(), failure.retryable()));
+      }
+      var prior = ((LedgerResult.Ok<Optional<MutationReceipt>>) recovery).data();
+      if (prior.isPresent()) return respondReceipt(context, new LedgerResult.Ok<>(prior.orElseThrow()));
     }
     var interpreted = interpreter.interpret(text);
     if (interpreted instanceof InterpretationResult.Problem problem) {

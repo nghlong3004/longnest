@@ -76,7 +76,7 @@ flowchart TB
     Q["LedgerQueryService [Component]<br/>Authorized get/recent/aggregate/filtered list"]
     V["Domain model [Component]<br/>Transaction lifecycle, Money, DateRange and date invariants"]
     P["LedgerStore persistence adapter [Component]<br/>Spring Data JPA / Hibernate repositories<br/>Flyway-owned schema; atomic mutation/action/result"]
-    F["LLM interpreter + tool adapter [Future extension, absent]<br/>Same typed contracts; no confirmation or store privilege"]
+    F["DeepSeek capture fallback [Opt-in code, no live acceptance]<br/>Validated draft only; no tool/confirmation/store privilege"]
   end
   D[("Ledger store [Data-store container]<br/>PostgreSQL — approved database")]
   T -->|Updates and authenticated user actions over HTTPS| A
@@ -93,15 +93,13 @@ flowchart TB
   C -->|Business receipt or action prompt| A
   Q -->|Business totals, transaction or page| A
   A -->|Rendered response over HTTPS Bot API| T
-  I -.->|Future A: unsupported phrasing fallback| F
-  A -.->|Future B: LLM instead of rules for text| F
-  F -.->|Typed command requests, no user proof| C
-  F -.->|Typed query requests| Q
+  I -.->|Selected default-off unknown-prose capture fallback| F
+  F -.->|Evidence-checked draft through trusted host| A
 ```
 
-Solid paths are current design; dotted paths are mutually alternative future
-interpretation routes, not implemented components or live data transmission.
-Neither route bypasses application authorization, exact Money/DateRange validation,
+Solid paths are current design; dotted paths show the selected default-off capture
+fallback, not live transmission. A general tool adapter and interpreter replacement
+remain absent. No route bypasses application authorization, exact Money/DateRange validation,
 idempotency, revision checks or durable consistency. Services return business results
 to their caller; the adapter renders them. Models do not turn prose into a receipt.
 
@@ -149,8 +147,8 @@ is an update, not a separate financial implementation or reporting service.
 - Future client: React latest, TypeScript 7, Vite latest and Tailwind CSS latest in
   `apps/client/`, accessing the same server/ledger after an authentication/API design
   is approved. No public API endpoints or frontend are defined/implemented now.
-- Future LLM: optional interpreter/tool adapter using either rules-first fallback
-  or interpreter replacement, the same typed intents and application services.
+- Optional LLM: selected default-off DeepSeek capture fallback uses the same typed
+  draft/application services. Broader tools and interpreter replacement are absent.
   See [strategy examples](SERVICES.md#future-interpretation-strategies). Provider/
   cost/privacy approval precedes any external text processing; no live agent
   platform, model-owned store, access grant or confirmation shortcut.

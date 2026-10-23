@@ -19,6 +19,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.function.Function;
 import java.util.List;
 import java.time.Clock;
+import me.nghlong3004.longnest.input.TransactionInterpreter;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.mapper.TransactionMapper;
 import me.nghlong3004.longnest.ledger.model.PersonalOwner;
@@ -52,7 +53,8 @@ class TelegramLifecycleTests {
     try (var executor = new SimpleAsyncTaskExecutor()) {
       var lifecycle = new TelegramConfiguration().telegramLifecycle(settings,
           new PersonalOwner("personal"), mock(TransactionMapper.class), mock(LedgerClient.class),
-          Clock.systemUTC(), mock(UiMessages.class), new ControlProofs(), executor);
+          Clock.systemUTC(), mock(UiMessages.class), new ControlProofs(),
+          new TransactionInterpreter(), executor);
       try {
         var http = (OkHttpClient) ReflectionTestUtils.getField(lifecycle, "http");
         assertThat(http.connectTimeoutMillis()).isEqualTo(5000);

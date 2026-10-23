@@ -329,12 +329,28 @@ the same application boundary; there is no direct-update bypass for future tools
 
 ## Future interpretation strategies
 
-Current release uses only the [bounded deterministic grammar](DOMAIN.md#selected-first-release-grammar).
-Future options, neither selected nor authorized to execute:
+Rules-first DeepSeek capture fallback is now selected for DS-FALLBACK-1;
+live endpoint/model approval, egress/privacy and monetary limits remain unresolved.
+See [exact routing/configuration](../apps/server/README.md#opt-in-deepseek-capture-fallback)
+and CURRENT STATUS for implementation acceptance. Default remains local rules.
+InputInterpreter returns only a draft or clarification, not host context, saved
+claims, arithmetic or action proof. No model tools or natural-language query/date/
+edit dispatcher is installed by this increment.
+
+Before eligible nondeterministic interpretation, the authenticated host invokes
+TransactionService.recoverCreateIfPresent through LedgerClient. Its short
+transaction recovers a frozen create/original receipt or explicitly returns empty;
+unavailable/conflicting storage is not absence. The provider runs outside that
+transaction, then ingest/create uses the original host event identity. Concurrent
+different drafts conflict instead of creating another purchase. Existing inbox/
+schema is reused, without storing raw prose or introducing a retention policy.
+
+Default input uses the [bounded deterministic grammar](DOMAIN.md#selected-first-release-grammar).
+The broader design alternatives below do not imply live execution authority:
 
 | Strategy | Interpretation route | What stays unchanged |
 | --- | --- | --- |
-| A: rules first, LLM fallback | Rules produce a ready intent or classify unsupported/uncertain phrasing. An authorized future fallback may try to interpret that phrasing. Missing business facts still go to the user. | Typed intent/result schema, tool adapters, two application services, domain validation, access/idempotency/delete confirmation and store. |
+| A: rules first, LLM fallback (selected, default off) | Rules produce a ready intent or classify unsupported phrasing. The bounded capture fallback may interpret eligible UNKNOWN_PHRASE input. Missing business facts still go to the user. | Typed intent/result schema, two application services, domain validation, access/idempotency/delete confirmation and store. |
 | B: LLM replaces rules | All input text goes to the future LLM interpreter, producing the same intent/tool request or clarification; buttons/explicit control actions can still route directly. | Exactly the same services, values and safeguards. No duplicate salary/expense/CRUD business implementation in prompts. |
 
 Switching changes the input-interpreter selection/routing, language coverage and
@@ -364,9 +380,9 @@ Examples (future LLM calls below are illustrative only):
   A model's “user confirmed”, a guessed ID, an old confirmation or `confirmed:true`
   cannot delete. Restore later calls the ordinary restore capability.
 
-No LLM calls, model/provider/tool SDK selection, live agent platform or external
-transmission of financial data is authorized. Provider, cost and privacy are later
-decisions, not dependencies for the current deterministic CRUD release.
+No live LLM calls, agent platform or external financial-data transmission is
+authorized. Existing Spring AI 2.0.1 is reused for fallback code; live endpoint/
+model, cost and privacy decisions remain separate from implementation.
 
 ## Future finance capabilities
 
