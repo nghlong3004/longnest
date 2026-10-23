@@ -14,6 +14,9 @@ public sealed interface InterpretationResult {
     REJECTED
   }
 
+  /** Parser coverage is not an authoritative domain failure, regardless of legacy UI status. */
+  enum FailureKind { RECOGNITION, VALIDATION }
+
   enum Code {
     UNKNOWN_PHRASE,
     UNSUPPORTED_INPUT,
@@ -37,13 +40,21 @@ public sealed interface InterpretationResult {
     }
   }
 
-  record Problem(Status status, Code code, String field, String example)
+  record Problem(Status status, Code code, String field, String example, FailureKind failureKind)
       implements InterpretationResult {
+    public Problem(Status status, Code code, String field, String example) {
+      this(status, code, field, example, switch (code) {
+        case INVALID_AMOUNT, AMBIGUOUS_AMOUNT, CONFLICTING_TYPE, INVALID_FIELD -> FailureKind.VALIDATION;
+        default -> FailureKind.RECOGNITION;
+      });
+    }
+
     public Problem {
       Objects.requireNonNull(status, "status");
       Objects.requireNonNull(code, "code");
       Objects.requireNonNull(field, "field");
       Objects.requireNonNull(example, "example");
+      Objects.requireNonNull(failureKind, "failureKind");
       if (status == Status.READY || field.isBlank() || example.isBlank()) {
         throw new IllegalArgumentException("A problem needs a non-ready status, field and example");
       }

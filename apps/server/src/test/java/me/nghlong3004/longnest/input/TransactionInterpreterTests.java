@@ -12,6 +12,7 @@ import me.nghlong3004.longnest.domain.Category;
 import me.nghlong3004.longnest.domain.TransactionDraft;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.InterpretationResult.Code;
+import me.nghlong3004.longnest.input.InterpretationResult.FailureKind;
 import me.nghlong3004.longnest.input.InterpretationResult.Problem;
 import me.nghlong3004.longnest.input.InterpretationResult.Ready;
 import me.nghlong3004.longnest.input.InterpretationResult.Status;
@@ -22,6 +23,42 @@ import org.junit.jupiter.params.provider.ValueSource;
 
 class TransactionInterpreterTests {
   private final TransactionInterpreter interpreter = new TransactionInterpreter();
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ăn trưa hết 45k", "ăn trưa 45 nghìn", "45 nghìn cho bữa trưa",
+      "-45k đồ dùng phòng 2", "ăn trưa 45k; cà phê 20k", "xem thu\nchi tháng này",
+      "2026-10-22 ăn trưa 45k", "mình vừa ăn bún", "45k", "xem\tchi tháng này",
+      "45nghìn cho bữa trưa", "ăn trưa 45,5 triệu", "45000 vnd cho bữa trưa"})
+  void parserCoverageFailuresAreExplicitlyDistinguishedFromFinancialValidation(String text) {
+    assertThat(interpreter.interpret(text)).isInstanceOfSatisfying(Problem.class,
+        problem -> assertThat(problem.failureKind()).isEqualTo(FailureKind.RECOGNITION));
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ăn trưa 0", "ăn trưa 45.000", "ăn trưa 1000000000001",
+      "ăn trưa 45k USD", "-45k USD đồ dùng", "+45k ăn trưa", "ăn trưa\u0000",
+      "-45k đ đồ dùng", "ăn trưa 1e6", "2026-02-30 ăn trưa 45k",
+      "+45k ăn trưa quán 2", "-45k lương công ty 2", "ăn trưa 1000000000000 triệu",
+      "ăn trưa 0.001 triệu", "ăn trưa 45,5 triệu USD"})
+  void actualFinancialSafetyFailuresStayLocal(String text) {
+    assertThat(interpreter.interpret(text)).isInstanceOfSatisfying(Problem.class,
+        problem -> assertThat(problem.failureKind()).isEqualTo(FailureKind.VALIDATION));
+  }
+
+  @Test
+  void amountlessSourceFactsComeOnlyFromAnOtherwiseCompleteKnownPhrase() {
+    var facts = interpreter.missingAmount("  ĂN   TRƯA  ").orElseThrow();
+    assertThat(facts.type()).isEqualTo(TransactionType.EXPENSE);
+    assertThat(facts.category()).isEqualTo(Category.FOOD);
+    assertThat(facts.note().value()).isEqualTo("ĂN TRƯA");
+    assertThat(interpreter.missingAmount("nhận lương").orElseThrow().type())
+        .isEqualTo(TransactionType.INCOME);
+    for (String text : new String[] {"", " ", "mua sách", "ăn trưa?", "ăn trưa hôm qua",
+        "+ăn trưa", "-lương", "ăn trưa 0", "ăn trưa 45k", "ăn trưa\n", "ăn trưa; lương"}) {
+      assertThat(interpreter.missingAmount(text)).as(text).isEmpty();
+    }
+    assertThat(interpreter.missingAmount(null)).isEmpty();
+  }
 
   @ParameterizedTest
   @CsvSource({

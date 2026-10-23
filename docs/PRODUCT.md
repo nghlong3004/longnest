@@ -60,6 +60,19 @@ and CURRENT STATUS owns acceptance.
 A model can request an action but not supply authorization or human delete proof.
 No integration or transmission of financial data is authorized now.
 
+Bounded capture polish: with the conversation binding enabled, an exact known
+phrase such as `ăn trưa` may ask for its missing amount; `45k` completes that one
+capture while preserving its original description/type/category/date. This is local
+validated clarification, not model-created draft facts, general multi-turn capture
+or expanded memory. Unrelated requests abandon it; existing expiry/reset boundaries
+apply. Clear complete captures still save immediately. Exact behavior/limits are in
+[the server guide](../apps/server/README.md#missing-amount-capture-clarification).
+That local phrase path is not a prerequisite for conversation: when enabled,
+unrecognized wording/grammar reaches the existing native tools to interpret or
+ask for missing facts. An unbound amount must not inherit an old purchase's type
+or description. Broader recognition does not add unsupported financial operations,
+weaken Money/authorization/confirmation checks or claim live language quality.
+
 ## Central full-product features, after the ledger release
 
 1. [Daily budget](features/daily-budget/README.md): configurable default allowance

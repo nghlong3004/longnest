@@ -330,6 +330,34 @@ the same application boundary; there is no direct-update bypass for future tools
 
 ## Native conversational interpretation
 
+RULES-LLM-ROUTING-1 keeps rules-first success and routes ordinary recognition
+failures to this same native path, not a bespoke interpreter. Problem.failureKind
+is internal parser evidence; legacy REJECTED status alone no longer blocks native
+interpretation. Recognized invalid financial facts remain local; unsupported
+financial requests may clarify UNSUPPORTED, never silently select a partial capture.
+All native callbacks still use the same validated value/mapper/service boundary.
+Unbound amount-only input reaches native clarification; a guessed create cannot
+borrow type/note from history and is host-converted to Missing.TYPE. Missing current
+amount cannot be invented; foreign currency prefixes/suffixes and arithmetic fragments
+cannot be discarded to pass Money. Existing ASCII sign/type assertions agree with
+native type, while negative magnitudes stay invalid. Recovery/storage failures,
+authorization and actual-user Save/Delete proofs never fall through to inference.
+No new callback/capability, model loop, memory expansion or default-off change.
+
+AMOUNT-CLARIFICATION-1 is a host-local branch within this binding, not an additional
+native tool: exact local amountless phrase → validated short-lived source facts →
+explicit unsigned amount reply → existing LedgerClient.create. The mapper builds
+TransactionInput with the original Vietnam financial date and source description;
+the authenticated completion event/message timestamp owns ingest/create identity.
+No model call or ledger-result egress is involved. The source is consumed before
+dispatch; frozen-event recovery takes precedence over ephemeral pending/attempt
+state. A retry before ingest has frozen its input may reuse only that same event's
+cached exact input, never another amount/event. All shared auth, Money, fingerprint,
+revision and actual-user confirmation contracts remain. Existing memory TTL/reset/
+identity/capacity bound this metadata, with a non-extending ten-minute source deadline
+and at most eight source-event tombstones; no schema/persistent pending workflow.
+See [lifecycle and limits](../apps/server/README.md#missing-amount-capture-clarification).
+
 NATIVE-AI-1 supersedes DS-FALLBACK-1 and NL-QUERY-1 at the same default-off activation
 boundary. Spring AI ChatClient and native callbacks replace bespoke JSON interpreters;
 local supported capture/commands remain direct. See [configuration and limits](../apps/server/README.md#opt-in-deepseek-conversation)

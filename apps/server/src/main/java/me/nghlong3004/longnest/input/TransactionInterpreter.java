@@ -17,21 +17,39 @@ import java.text.Normalizer;
 import java.util.Currency;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 import me.nghlong3004.longnest.domain.Category;
+import me.nghlong3004.longnest.domain.DateRange;
 import me.nghlong3004.longnest.domain.Money;
 import me.nghlong3004.longnest.domain.Note;
 import me.nghlong3004.longnest.domain.TransactionDraft;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.InterpretationResult.Code;
+import me.nghlong3004.longnest.input.InterpretationResult.FailureKind;
 import me.nghlong3004.longnest.input.InterpretationResult.Problem;
 import me.nghlong3004.longnest.input.InterpretationResult.Ready;
 import me.nghlong3004.longnest.input.InterpretationResult.Status;
 
 /** Stateless finite-grammar interpreter. Host date, identity and persistence remain outside it. */
 public final class TransactionInterpreter implements InputInterpreter {
+  /** Source facts only: no invented placeholder amount or model-derived financial fields. */
+  public record AmountlessCapture(TransactionType type, Category category, Note note) {}
+
+  /** Recognizes only an existing complete local phrase lacking its amount. */
+  public Optional<AmountlessCapture> missingAmount(String message) {
+    if (!(interpret(message) instanceof Problem problem) || problem.code() != MISSING_AMOUNT) {
+      return Optional.empty();
+    }
+    String text = WHITESPACE.matcher(Normalizer.normalize(message, Normalizer.Form.NFC))
+        .replaceAll(" ").trim();
+    var category = PHRASES.get(text.toLowerCase(Locale.ROOT));
+    return category == null ? Optional.empty()
+        : Optional.of(new AmountlessCapture(typeOf(category), category, new Note(text)));
+  }
+
   /** Local capture guard only; conversational understanding belongs to native tools. */
   public static boolean isQuery(String text) {
     return text.matches("(?is).*[?？﹖].*") || Pattern.compile(
@@ -79,15 +97,18 @@ public final class TransactionInterpreter implements InputInterpreter {
     if (message == null) {
       return problem(REJECTED, INVALID_FIELD, "text");
     }
-    if (message.indexOf(';') >= 0
-        || message.codePoints().anyMatch(TransactionInterpreter::isLineBreak)) {
+    if (hasTransactionSeparator(message)) {
       return problem(REJECTED, UNSUPPORTED_INPUT, "text");
     }
-    if (message.codePointCount(0, message.length()) > Note.MAX_CODE_POINTS
-        || message.codePoints()
-            .anyMatch(
-                cp -> Character.isISOControl(cp) || Character.getType(cp) == Character.SURROGATE)) {
-      return problem(REJECTED, INVALID_FIELD, "text");
+    if (message.codePoints().anyMatch(cp -> Character.isISOControl(cp)
+        || Character.getType(cp) == Character.SURROGATE)) {
+      boolean onlyTabs = message.codePoints().noneMatch(cp -> (Character.isISOControl(cp)
+          && cp != '\t') || Character.getType(cp) == Character.SURROGATE);
+      return new Problem(REJECTED, INVALID_FIELD, "text", EXAMPLE,
+          onlyTabs ? FailureKind.RECOGNITION : FailureKind.VALIDATION);
+    }
+    if (message.codePointCount(0, message.length()) > Note.MAX_CODE_POINTS) {
+      return new Problem(REJECTED, INVALID_FIELD, "text", EXAMPLE, FailureKind.RECOGNITION);
     }
     String text =
         WHITESPACE.matcher(Normalizer.normalize(message, Normalizer.Form.NFC))
@@ -169,7 +190,8 @@ public final class TransactionInterpreter implements InputInterpreter {
       return problem(NEEDS_CLARIFICATION, UNSUPPORTED_INPUT, "note");
     }
     if (description.codePoints().anyMatch(TransactionInterpreter::isDescriptionNumberOrSign)) {
-      return problem(REJECTED, UNSUPPORTED_INPUT, "note");
+      return new Problem(REJECTED, UNSUPPORTED_INPUT, "note", EXAMPLE,
+          hasConflictingSignedType(text) ? FailureKind.VALIDATION : FailureKind.RECOGNITION);
     }
     String lower = description.toLowerCase(Locale.ROOT);
     var cues = KNOWN_CUES.matcher(lower);
@@ -202,7 +224,66 @@ public final class TransactionInterpreter implements InputInterpreter {
     if (GROUPED_AMOUNT.matcher(amount).find() || AMBIGUOUS_DECIMAL.matcher(amount).matches()) {
       return problem(NEEDS_CLARIFICATION, AMBIGUOUS_AMOUNT, "amountMinor");
     }
-    return problem(REJECTED, INVALID_AMOUNT, "amountMinor");
+    // The legacy parser feeds the entire remaining phrase here, not necessarily a money value.
+    String first = firstToken(amount);
+    String rest = amount.substring(first.length()).stripLeading();
+    String unit = firstToken(rest);
+    String literal = first;
+    if (unit.matches("(?iu)nghìn|ngàn|triệu")
+        || (first.matches("[0-9]+") && unit.matches("(?iu)đ|vnd"))) {
+      literal += " " + unit;
+      rest = rest.substring(unit.length()).stripLeading();
+    }
+    FailureKind kind = FailureKind.VALIDATION;
+    try {
+      conversationAmount(literal);
+      if (rest.isEmpty() || !isCurrencyMarker(firstToken(rest))) kind = FailureKind.RECOGNITION;
+    } catch (IllegalArgumentException invalid) {
+      if (!first.matches("(?iu)(?:[\\p{N}\\p{Sc}+.,\\-].*|nan|infinity)")) {
+        kind = FailureKind.RECOGNITION;
+      }
+      if (first.matches("[0-9]{4}-[0-9]{2}-[0-9]{2}")) {
+        try {
+          DateRange.parse(first, first);
+          kind = FailureKind.RECOGNITION;
+        } catch (IllegalArgumentException invalidDate) {
+          // A malformed date is not permission to substitute a money value or another date.
+        }
+      }
+    }
+    return new Problem(REJECTED, INVALID_AMOUNT, "amountMinor", EXAMPLE, kind);
+  }
+
+  /** Existing native magnitude vocabulary only; the deterministic grammar remains unchanged. */
+  public static Money conversationAmount(String value) {
+    return Money.parse(value.toLowerCase(Locale.ROOT).replaceFirst(" *(nghìn|ngàn)$", "k")
+        .replaceFirst(" *triệu$", "tr"));
+  }
+
+  public static boolean isAmountOnly(String text) {
+    try {
+      conversationAmount(text.strip());
+      return true;
+    } catch (IllegalArgumentException invalid) {
+      return false;
+    }
+  }
+
+  /** Signed assertions retain their existing cue-conflict rule even outside finite note grammar. */
+  public static boolean hasConflictingSignedType(String text) {
+    String value = WHITESPACE.matcher(Normalizer.normalize(text, Normalizer.Form.NFC))
+        .replaceAll(" ").trim();
+    if (!value.startsWith("+") && !value.startsWith("-")) return false;
+    TransactionType type = value.startsWith("+") ? TransactionType.INCOME : TransactionType.EXPENSE;
+    var matches = KNOWN_CUES.matcher(value.substring(1).toLowerCase(Locale.ROOT));
+    while (matches.find()) {
+      if (!PHRASES.get(matches.group()).supports(type)) return true;
+    }
+    return false;
+  }
+
+  public static boolean hasTransactionSeparator(String text) {
+    return text.indexOf(';') >= 0 || text.codePoints().anyMatch(TransactionInterpreter::isLineBreak);
   }
 
   private static Problem problem(Status status, Code code, String field) {

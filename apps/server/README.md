@@ -34,12 +34,36 @@ missing/unsupported labels retain neutral wording. This is literal presentation
 only: names never become principal, event/scope/proof, tool arguments, model prompt
 or memory. Financial receipts/pages/confirmation controls remain authoritative.
 
-When enabled, non-ready ordinary text goes through one native model request;
-known invalid/ambiguous money, conflicting types and rejected local input stay
-local. Clear supported captures, slash commands and authenticated edit prompts/
+When enabled, unresolved ordinary text goes through one native model request;
+`REJECTED` is a legacy parser/UI status, not itself a safety decision. Internal
+RECOGNITION versus VALIDATION metadata distinguishes unsupported grammar/wording
+from locally established invalid/ambiguous money, currency, conflicting types or
+unsafe/domain-invalid fields. Recognition failures reach native tools even if the
+local parser called them rejected; validation failures stay local. Clear supported
+captures, slash commands and authenticated edit prompts/
 Save/Delete/Cancel controls still bypass inference. Native callbacks support
 list/recent/get, clear create, edit preview, Delete request, Restore and clarification.
 There is no model Save/Confirm/Cancel tool, SQL access or model-selected identity.
+
+Examples newly covered by fake native routing include `ăn trưa hết 45k`,
+`45 nghìn cho bữa trưa` and `-45k đồ dùng phòng 2`. The native proposal still needs
+a whole current-message amount, compatible type/category, literal safe note and
+valid financial date; the same mapper/services own create and all business checks.
+ASCII leading signs remain type assertions, not negative magnitudes, and must
+agree with the proposed type. Foreign currency on either side and arithmetic fragments
+cannot be stripped to produce an apparently valid VND amount. Missing facts must
+clarify, never use an invented value or borrow a prior purchase. Native tools can
+truthfully clarify UNSUPPORTED; broader routing does not add refunds/transfers,
+multi-capture, new filters or any other financial capability.
+
+The existing native input bound is 1,024 code points; long text rejected only by
+the 256-code-point local grammar may reach inference, but Note remains bounded to
+256 normalized code points. Native questions can contain ordinary line/tab breaks;
+unsafe controls/surrogates still cannot reach the provider. Multiline/semicolon
+capture proposals remain unsupported rather than saving one selected part.
+Default-off parsing/status/error examples and all command/control routing remain
+unchanged. Wider enabled coverage can mean additional utterance/history egress
+and requests; live data/cost authority is not changed by this implementation.
 
 With frozen Vietnam business date 2026-10-23, synthetic interactions include:
 
@@ -66,6 +90,51 @@ revision; callbacks call existing services, and Vietnamese rendering uses only
 service results. No ledger contents or tool results return to the model, and no
 second model call/automatic tool loop is made. Native tools are standard function
 schemas, not DeepSeek beta strict-function/schema guarantees.
+
+### Missing-amount capture clarification
+
+With the conversation binding enabled, `ăn trưa` → localized amount question →
+`45k` saves one EXPENSE/FOOD entry with note `ăn trưa`. This path makes **no model
+call**: only exact existing local phrases/aliases may supply pending type/category/
+description. Questions, signed fragments, free prose and date-bearing fragments
+cannot establish these facts. The original authenticated message's Vietnam date
+is frozen, even across midnight; the amount reply supplies the create event ID
+and source timestamp. Only a whole, unsigned `Money` expression such as `45k`,
+`45000 vnd` or `45` completes it; the already-supported native labels `nghìn`,
+`ngàn`, `triệu` use the same exact Money conversion locally (e.g. `45 nghìn`).
+Bare `45` remains 45 VND, not 45,000.
+
+One pending source is isolated by the existing principal/bot/private-user context,
+with an absolute ten-minute lifetime that invalid replies/repeated delivery do not
+extend. Recognized numeric amount-like invalid/ambiguous replies (e.g. `0`, `45.000`,
+`45 k`, `45k USD`, `45k 50k`) ask again, without writing or inference. Other text
+abandons it and follows normal routing. A new known amountless phrase replaces it;
+a complete capture still saves immediately. Commands, authenticated callbacks,
+non-text input and actual edit-field replies abandon it; `/reset`, expiry, eviction
+and restart forget it. No model arguments/history may fill or alter pending facts.
+Explicit Telegram amount replies must target the latest displayed local amount
+question; a reply to an older conversational question clarifies without consuming
+the current replacement. An ordinary unthreaded amount reply may complete the
+current source. Deterministic commands, complete captures and field replies retain
+their existing routes even while a canceled inference task is still unwinding.
+
+Completion consumes the source before create. The same completion event recovers
+its frozen result first; if ingest has not yet frozen anything, an in-memory attempt
+retains the exact original input for that event only until success, its source
+deadline or abandonment. Another amount event cannot consume it again. With no
+pending source, amount-only input continues to native clarification (normally
+TYPE), never a history-derived write: even a guessed create callback is converted
+to a missing-type question by the host. Known phrase handling is an optional
+local resolution, not a prerequisite for native conversation. Unknown prose can
+ask for missing amount/type through native tools, but no broader pending draft
+or history-derived source facts are created; restate complete source facts when
+needed rather than treating an earlier unvalidated description as authoritative.
+Up to eight source-event IDs are remembered per existing context lifetime so an
+old source delivery cannot rearm it; on reaching that bound ask for a full capture
+instead of evicting an ID. Reset/expiry/restart also forget these ephemeral IDs;
+they are not durable deduplication. Completed creates retain ordinary durable
+event recovery. New full capture messages are distinct purchases, not retries.
+Financial save/replay and actual-user Edit/Save/Delete/Restore controls are unchanged.
 
 Before inference, recover any frozen create, preview/Delete request or completed
 Restore for the same host event. Storage failure stops interpretation. Recovery

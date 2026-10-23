@@ -3,11 +3,15 @@ package me.nghlong3004.longnest.conversation;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import me.nghlong3004.longnest.domain.DateRange;
 import me.nghlong3004.longnest.domain.RangeFilter;
+import me.nghlong3004.longnest.domain.Money;
+import me.nghlong3004.longnest.input.TransactionInterpreter.AmountlessCapture;
 import org.springframework.ai.chat.memory.ChatMemory;
 import org.springframework.ai.chat.memory.MessageWindowChatMemory;
 import org.springframework.ai.chat.messages.Message;
@@ -24,13 +28,29 @@ public final class ConversationMemory implements ChatMemory {
 
   record Query(DateRange range, RangeFilter filter) {}
   record Target(String id, String revision) {}
+  record PendingAmount(String sourceEvent, AmountlessCapture facts, LocalDate date, Instant expiry) {}
+  record AmountAttempt(String event, PendingAmount source, Money amount) {}
 
   static final class State {
     private Instant expiry;
     Query query;
     Target target;
+    PendingAmount pendingAmount;
+    AmountAttempt amountAttempt;
+    Integer amountQuestion;
+    final LinkedHashSet<String> amountSources = new LinkedHashSet<>();
 
     State(Instant expiry) { this.expiry = expiry; }
+  }
+
+  /** Adapter dispatch is sequential; model workers never read or write amount metadata. */
+  synchronized void abandonAmount(String id) {
+    State state = states.get(id);
+    if (state != null) {
+      state.pendingAmount = null;
+      state.amountAttempt = null;
+      state.amountQuestion = null;
+    }
   }
 
   synchronized State state(String id) {

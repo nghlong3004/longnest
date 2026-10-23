@@ -84,6 +84,16 @@ public class TelegramCapture {
     var context = new HostContext(owner.principal(), settings.getNamespace() + update.getUpdateId(),
         reference, sentAt, scope());
     String text = message.getText();
+    boolean fieldReply = message.getReplyToMessage() != null && !(conversation != null
+        && (conversationalReplies.contains(message.getReplyToMessage().getMessageId())
+            || navigation.knownMessage(settings.getUser(),
+                message.getReplyToMessage().getMessageId())));
+    if (conversation != null) {
+      var amount = conversation.amountCapture(context, text,
+          text != null && !text.startsWith("/") && !fieldReply,
+          message.getReplyToMessage() == null ? null : message.getReplyToMessage().getMessageId());
+      if (amount.isPresent()) return conversationReply(context, amount.orElseThrow(), message.getFrom());
+    }
     if (text == null || text.equals("/start") || text.equals("/help")) {
       send(message.getChat().getId(), replies.help());
       return true;
@@ -134,10 +144,7 @@ public class TelegramCapture {
       send(message.getChat().getId(), replies.help());
       return true;
     }
-    if (message.getReplyToMessage() != null && !(conversation != null
-        && (conversationalReplies.contains(message.getReplyToMessage().getMessageId())
-            || navigation.knownMessage(settings.getUser(),
-                message.getReplyToMessage().getMessageId())))) {
+    if (fieldReply) {
       var replied = message.getReplyToMessage();
       if (replied.getMessageId() == null || replied.getMessageId() <= 0) {
         send(settings.getUser(), replies.stalePrompt());
@@ -155,10 +162,7 @@ public class TelegramCapture {
     }
     var interpreted = interpreter.interpret(text);
     if (conversation != null && interpreted instanceof InterpretationResult.Problem problem
-        && problem.status() != InterpretationResult.Status.REJECTED
-        && problem.code() != InterpretationResult.Code.INVALID_AMOUNT
-        && problem.code() != InterpretationResult.Code.AMBIGUOUS_AMOUNT
-        && problem.code() != InterpretationResult.Code.CONFLICTING_TYPE) {
+        && problem.failureKind() == InterpretationResult.FailureKind.RECOGNITION) {
       return conversationReply(context, conversation.reply(context, text), message.getFrom());
     }
     if (interpreted instanceof InterpretationResult.Problem problem) {
@@ -191,6 +195,7 @@ public class TelegramCapture {
     if (callback.getData() == null) return true;
     var context = new HostContext(owner.principal(),
         settings.getNamespace() + update.getUpdateId(), clock.instant(), null, scope());
+    if (conversation != null) conversation.amountCapture(context, null, false, null);
     if (callback.getData().startsWith("a:") || callback.getData().startsWith("p:")) {
       return actionCallback(context, callback, message);
     }
@@ -430,6 +435,9 @@ public class TelegramCapture {
     if (reply.messageKey() != null) {
       Message sent = send(settings.getUser(), replies.conversation(reply.messageKey(),
           presentation.getFirstName(), presentation.getLastName()), null);
+      if (reply.messageKey().equals("conversation.AMOUNT")) {
+        conversation.bindAmountQuestion(context, sent.getMessageId());
+      }
       if (conversationalReplies.size() >= 100) {
         conversationalReplies.remove(conversationalReplies.iterator().next());
       }

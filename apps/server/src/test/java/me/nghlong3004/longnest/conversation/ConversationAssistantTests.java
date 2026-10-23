@@ -303,6 +303,20 @@ class ConversationAssistantTests {
     verify(ledger, never()).confirmDelete(any(), any(), any());
   }
 
+  @ParameterizedTest
+  @ValueSource(strings = {"+45k ăn trưa quán 2", "-45k lương công ty 2"})
+  void nativeCreateChecksSignedCueConflictIndependentlyOfParserNoteGrammar(String text) {
+    String type = text.startsWith("+") ? "INCOME" : "EXPENSE";
+    select("create_transaction", """
+        {"type":"%s","amount":"45k","currency":"VND","category":"UNCATEGORIZED",
+         "note":"","period":"TODAY"}
+        """.formatted(type));
+    // Exceed the local grammar's raw length so only the callback's independent cue guard applies.
+    assistant.reply(host("1"), text + " " + "x".repeat(300));
+    verify(model).call(any(Prompt.class));
+    verify(ledger, never()).create(any(), any());
+  }
+
   private MutationReceipt receipt() {
     return new MutationReceipt("1", "create", true, true, new TransactionView("42", "3",
         TransactionType.EXPENSE, "45000", "VND", Category.FOOD, "private ledger note",

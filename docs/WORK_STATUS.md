@@ -7,6 +7,246 @@ runtime unverified, no working ledger/bot yet.**
 
 ## Current operation — deterministic L1–L3 code accepted locally; runtime evidence outstanding
 
+### Publication — accepted amount clarification and native fallback
+
+Explicit publication authority now covers AMOUNT-CLARIFICATION-1 plus
+RULES-LLM-ROUTING-1 only. Same Lead owns publication; all source writers and
+read-only Peers are stopped/released. Fresh checks reproduce all109 accepted
+server hashes and final manifest/archive digests below. Reuse the recorded635-test
+package and isolated smoke passes; no build or live integration was rerun.
+Reviewed19 related public paths, including both new synthetic test files and the
+prior intentional status note. Private env files remain ignored/untracked; no
+private/generated path or credential-like public content was flagged (not an
+exhaustive secret guarantee). Configured author/committer are Long; branch main,
+upstream origin/main and origin git@github.com:nghlong3004/longnest.git match the
+authorized destination. Independent SSH ls-remote confirms remote main still at
+base24036d5. Normal commit/push outcome will be recorded after publication without
+a postcommit status-only amend/commit loop. Historical local acceptance details
+below describe the frozen pre-publication state; no feature changes were reopened.
+
+### RULES-LLM-ROUTING-1 — ACCEPT consistent fallback
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` reopens input recognition metadata,
+native/pending routing and argument guards, affected synthetic fixtures and docs.
+Accepted input is AMOUNT-CLARIFICATION-1 manifest `6f585094...2d2e9bfe` on Git
+base `24036d5`; all 109 file hashes matched before writes. Same Lead; both prior
+read-only Peers are released/idle with no writers. Accepted local changes and
+the prior post-push status note remain intact; no unrelated scope is taken.
+Outcome: successful deterministic capture/commands/controls stay local; parser
+recognition failures reach native interpretation/clarification when enabled.
+Separate recognition failure from validated financial/safety failure, preserve
+default-off diagnostics, pending-source guarantees, service/auth/replay/storage/
+actual-user proof boundaries. No new tool, broader financial policy, longer memory,
+bespoke interpreter, private env, live/paid call or Git action. Lead owns local
+verification and acceptance; no Peer write assignment is opened.
+
+Candidate frozen for read-only inspection: server manifest
+`apps/server/target/rules-llm-candidate-server.sha256`, SHA-256
+`9337698bacd2a787c4156b2cec1014e22354e01378409c6996ed40f701fe3b23`.
+Two intermediate package checks passed609 tests; final snapshot additionally reuses
+the existing native magnitude conversion for local pending replies with three
+synthetic cases. Selected current `slp-peer`/gpt-6.1-sol/medium profile; no read-only
+runtime mode exists, so auto plus explicit read-only/no-build brief. Lead retains
+all writes and freezes this candidate during inspection; builds/evidence may run.
+Read-only Peer `2bb1f76f-5897-4147-b065-133f28fb22f1` is inspecting that snapshot;
+no write ownership is transferred. Exact candidate package passes612 tests.
+Peer submitted/stopped with all109 hashes matching. ACCEPT four static findings
+and REJECT `9337698...fe3b23` for final acceptance: signed conflicting cues hidden
+by numeric note grammar (P1); Unicode separator partial-capture gap (P2); supported
+native magnitude spellings still tagged validation (P2); safe tabs still tagged
+validation (P2). No extra pending/auth/storage/proof defect found. Lead owns exactly
+these repairs/regressions from that snapshot; source freeze lifted for Lead only,
+Peer loop closed with no further assignment or write ownership.
+
+Final Lead disposition: ACCEPT repaired 109-file server snapshot
+`apps/server/target/rules-llm-candidate-server-final.sha256`, SHA-256
+`10cca82ee8953d2d0b50aaa03605739618f4b4e1cc4d85adc2c948a62b7dded6`.
+Archive `apps/server/target/rules-llm-candidate-server-final.tar.gz`, SHA-256
+`583686a5ff8a38f705a12f6728f148a15ab20e352d7167ebe26e52237214d2d3`.
+All source hashes reproduce; writers/builds stopped. Peer findings are closed by
+the named Lead repairs and dedicated passing regressions, not by reusing the
+rejected candidate's passing tests. No Peer retains an assignment/write scope.
+
+Exact routing: internal Problem.failureKind separates RECOGNITION from VALIDATION
+without changing default-off legacy statuses/codes/grammar. Unsupported grammar,
+extra prose, valid date prefixes, native magnitude wording, digits in notes,
+safe conversational whitespace and incomplete intent reach the existing native
+ChatClient/tools when enabled. Examples: `ăn trưa hết 45k`, `45nghìn cho bữa trưa`,
+`ăn trưa 45,5 triệu`, `-45k đồ dùng phòng 2`, `xem\tchi tháng này`.
+Known invalid/ambiguous Money/currency, contradictory signed type cues and unsafe/
+domain-invalid fields remain local. Native text keeps the existing1024-code-point
+bound; Note/Money/date domain bounds are still independently enforced. Ordinary
+line/tab breaks may reach native reads/clarification; the complete existing
+transaction-separator definition (including Unicode line/paragraph separators)
+prevents native create from silently selecting part of a multi-capture request.
+
+Successful rules, protocol commands, field replies and authenticated user controls
+remain local, including while canceled inference unwinds. Known local pending
+amount completion remains local with original validated facts/date, absolute TTL,
+identity/reset/eviction/source-event/question binding and single consumption intact.
+It reuses existing native nghìn/ngàn/triệu conversion, not model arithmetic. When
+no validated pending source exists, amount-only input continues to native missing-
+fact clarification instead of stopping at a known-phrase gate. A guessed native
+create for an amount-only message is host-converted to Missing.TYPE; a missing
+current amount cannot be invented. No history-derived pending financial draft
+or broader capture workflow is installed; restate complete current source facts
+when a prose clarification has no validated pending source. Foreign currency
+before/after a literal, partial arithmetic and contradictory ASCII signed source
+types cannot be normalized into a valid-looking create. Signed cue checking is
+independent of local note grammar/raw length and normalizes NFC/whitespace.
+
+Recovery/storage failures and authorization never fall through into interpretation;
+all proposed financial values use existing mappers/services and actual-user proof
+contracts. Unsupported financial requests may clarify UNSUPPORTED, never gain a
+new capability. No callback, schema/dependency/configuration, output-token option,
+memory duration/capacity, model loop, budget/allocation policy, category query or
+multi-field editing change. Model input/history coverage is broader when enabled,
+so actual request/egress/cost exposure can increase; activation authority is not.
+
+Verification: Java25.0.4.1/Maven3.10.0, isolated environment, offline existing
+cache and empty user/global settings. `apps/server/target/` evidence:
+`rules-llm-repaired-focused.log`329 passing focused cases;
+`rules-llm-package-repaired.log` **635 tests, zero failures/errors/skips**
+(accepted baseline564 +71); `rules-llm-smoke-final.log` exit0, non-web context,
+managed virtual-thread execution/closure. Earlier focused/package passes and
+the rejected snapshot/archive remain separate evidence. New fake-model fixtures
+exercise formerly rejected grammar through real ChatClient/native callbacks,
+current literal/source/type/currency/amount/date validation, missing facts and
+unsupported requests. Existing unauthorized, storage-failure/frozen-delivery
+recovery, direct controls and full pending-capture integration regressions pass.
+All four Peer findings have passing targeted regressions; native direct-call tests
+also protect signed cue conflict beyond the finite parser's raw input limit.
+No real provider, Telegram, PostgreSQL or paid call was made. Existing nonfatal
+SDK/Lombok/Mockito warnings remain; this is not live language or DB evidence.
+
+Increment since accepted AMOUNT snapshot: 11 server paths changed, 98 unchanged,
+none added/removed. Server paths: `apps/server/README.md`; Java
+`conversation/ConversationAssistant.java`, `conversation/LedgerTools.java`,
+`input/InterpretationResult.java`, `input/TransactionInterpreter.java`,
+`telegram/adapter/TelegramCapture.java`; tests
+`conversation/AmountClarificationTests.java`,
+`conversation/ConversationAssistantTests.java`, `input/TransactionInterpreterTests.java`,
+`telegram/TelegramAdapterTests.java`, `telegram/TelegramAmountClarificationTests.java`.
+Other changed paths: `AGENTS.md`, `docs/DECISIONS.md`, `docs/DOMAIN.md`,
+`docs/PRODUCT.md`, `docs/SERVICES.md`, `docs/WORK_STATUS.md`.
+Combined worktree has19 public changed paths, including the retained prior amount
+increment's ConversationMemory/resource edits and its two new test files. Static
+checks: seven Markdown docs/90 local targets,110 unique resource keys, whitespace,
+ignore/tracking and credential-like content/path scan pass (not a universal secret
+detection guarantee). Private `.env`/`.env.dev` remain ignored/untracked with no
+private-file access/edit; nothing staged and HEAD remains `24036d5`. No commit,
+push, external call, activation or unrelated work was taken. Exact source is
+frozen for handoff. Actual semantic intent, Vietnamese/model accuracy, latency/
+cost, prompt-injection robustness, PostgreSQL durability and live Telegram UX
+remain unverified; neither broad routing nor valid arguments prove those qualities.
+
+### AMOUNT-CLARIFICATION-1 — ACCEPT bounded local completion
+
+Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns the cohesive local input,
+conversation memory/dispatch, Telegram routing, synthetic tests and affected docs.
+Base `24036d5ca2a579586b96f1f0e18c2bebc317329b`; only the intentional prior
+post-push status note was dirty. Same Lead/current room reconciled; prior review
+Peer is released, with no active writer. No delegation or concurrent scope.
+Outcome: known local phrase missing only amount → localized question → exact
+amount-only reply → authoritative create preserving validated source facts/date.
+No model-derived pending facts, schema, new tool, longer/persistent memory or
+proposals 2/3. Verify invalid replies, abandonment, expiry/reset/isolation and
+trusted-event replay with local fixtures, then freeze/dispose exact candidate.
+No private-env changes, provider/DB/Telegram/paid calls, activation or Git action.
+
+Lead source candidate frozen for independent inspection: 109-file server manifest
+`apps/server/target/amount-candidate-server.sha256`, SHA-256
+`1323e80d442e484b11d785c95413b76c90c23e96db6e6a3edcb9f3110475c0b6`.
+`amount-package.log`: 560 tests passed, no failures/errors/skips. A fresh read-only
+Peer brief asks about consumption/replay/expiry and adapter/control routing, not
+new features. Selected configured `slp-peer`/gpt-6.1-sol/medium; provider lacks a
+read-only runtime mode, so normal mode with explicit no-write/no-build scope.
+Read-only Peer `a265b6b5-f826-41a7-9aef-595be1446c91` has no write scope;
+Lead alone retains all writes; server source remains frozen during inspection.
+
+Read-only Peer submitted/stopped with all 109 hashes matching; ACCEPT its two
+findings and REJECT snapshot `1323e80d...75c0b6` for final acceptance: an explicit
+reply to an old amount question can consume a replacement source (P1); pre-routing
+busy check can block deterministic capture/commands after model timeout (P2).
+No other important defect reported; static inspection, not executed fixtures.
+Lead owns both repairs and regressions from that exact snapshot; Peer has no
+further work/writes. Source freeze is lifted only for this named Lead repair.
+
+Final Lead disposition: ACCEPT exact repaired 109-file server manifest
+`apps/server/target/amount-candidate-server-final.sha256`, SHA-256
+`6f58509413c1db34be3cfc8f2e74e51e286d1e7cf08322be3bde239b2d2e9bfe`.
+Archive `apps/server/target/amount-candidate-server-final.tar.gz`, SHA-256
+`0a101cc73fc453a294ea926c71af98e68c4e269ef2cf2832dbdbd591d1bb20d3`.
+Implementation/build writers stopped; no Peer owns writes. The rejected original
+manifest/archive and its verification logs remain separate, not promoted evidence.
+
+Precise behavior: only an exact existing local phrase/alias lacking amount can
+establish type/category/normalized note and original Vietnam financial date.
+`ăn trưa` → localized amount question → unsigned exact `45k` → shared create and
+service-authoritative receipt preserving `ăn trưa`, EXPENSE/FOOD and original date.
+No model call or invented placeholder/source fact. Bare `45` remains 45 VND.
+The authenticated completion event/timestamp owns ingest; source facts expire at
+an absolute ten-minute deadline inside the unchanged idle/context/reset boundary.
+Recognized numeric amount-like invalid replies ask again without write/inference;
+other requests abandon it. New amountless source replaces it; clear complete
+capture stays immediate. Commands/non-text/valid callbacks/field replies abandon
+pending capture without gating their existing routes on model busy. Explicit
+amount replies to stale conversational questions clarify without consuming the
+replacement; only the latest bound amount question or an unthreaded reply can
+complete the current source. Expiry, reset, eviction/restart forget unsaved state.
+
+Consume source before dispatch. Same-event durable recovery precedes ephemeral
+completion; if nothing has frozen, a same-event cached attempt preserves exact
+input until success, source deadline or abandonment. Another amount event cannot
+reuse it. At most eight source-event tombstones per current context lifetime:
+duplicates do not rearm or extend deadlines; once full, ask for a complete capture
+instead of evicting IDs. These IDs/question bindings are ephemeral, not durable
+prompt deduplication across reset/expiry/restart. Completed creates keep ordinary
+durable event recovery. No semantic duplicate suppression for new full messages.
+
+Verification: isolated env, Java25.0.4.1/Maven3.10.0, offline existing cache and
+empty user/global settings as in the previous accepted increment. Local logs under
+`apps/server/target/`: `amount-package-final.log` **564 tests passed, zero failures/
+errors/skips** (baseline530 +34); `amount-smoke-final.log` exit0, non-web context,
+managed virtual-thread execution and closure. New tests cover exact facts, income/
+bare dong, midnight, invalid amounts, unrelated/complete/new source, identity,
+absolute expiry/reset/eviction/restart, failed-ingest retry input, unavailable
+recovery, real service/mapper/renderer over mock store, committed-receipt delivery
+failure/recovery without second insert, stale/current-question association and
+deterministic routes while an interrupted fake model ignores cancellation.
+Existing single-tool, confirmation, replay, SDK output-default and memory checks
+still pass. This is mock-port evidence, not real transaction/durability or live UX.
+Initial focused failures were test-only expectations (foreign principal uses
+LedgerException; configured Mockito cannot mock a final receipt record); repaired
+using actual error contract/receipt values. `amount-focused.log` preserves those
+failures; `amount-integrated.log`/`amount-repaired.log` preserve intermediate passes.
+Both Peer findings have dedicated passing regression fixtures in the final package.
+
+Static verification: 16 changed public paths, seven Markdown docs/90 local targets,
+110 unique Vietnamese resource keys, whitespace and all server hashes pass.
+No private/generated/credential-like outgoing path/content flagged; pattern scans
+are not universal secret detection. Private `.env`/`.env.dev` remain ignored and
+untracked, with no private-file read/edit in this increment. Nothing staged; HEAD
+remains base `24036d5`. No Git commit/push, network/provider/Telegram/DB/paid effect.
+No schema/dependency/configuration, memory-duration/capacity, new native tool,
+multi-tool policy, category query or multi-field-edit change. Existing nonblocking
+deterministic routing and actual-user Save/Delete/Restore contracts are preserved.
+
+Complete changed paths: `AGENTS.md`; `apps/server/README.md`; server Java
+`conversation/ConversationAssistant.java`, `conversation/ConversationMemory.java`,
+`conversation/LedgerTools.java`, `input/TransactionInterpreter.java`,
+`telegram/adapter/TelegramCapture.java`; `messages_vi.properties`; existing test
+`input/TransactionInterpreterTests.java`; new tests
+`conversation/AmountClarificationTests.java`,
+`telegram/TelegramAmountClarificationTests.java`; `docs/DECISIONS.md`,
+`docs/DOMAIN.md`, `docs/PRODUCT.md`, `docs/SERVICES.md`, `docs/WORK_STATUS.md`.
+The prior intentional post-publication status note is preserved. All source is
+frozen/stopped for local handoff; no dependent assignment or active Peer remains.
+Usable within the existing default-off native binding, with no model call for
+local clarification. Arbitrary prose/date-bearing/signed fragments and broader
+missing-fact workflows remain unsupported. No live language quality, PostgreSQL
+durability or Telegram runtime readiness is claimed; existing authority unchanged.
+
 ### CONVERSATION-POLISH-1 — ACCEPT provider-default output and presentation-only name
 
 Lead `39abd32c-52fa-4cdf-82b4-fa507677fd06` owns conversation configuration/prompt,
@@ -86,6 +326,15 @@ or necessarily cheaper. Live language quality, PostgreSQL durability and Telegra
 runtime behavior remain unverified; default-off/live/paid/egress authority unchanged.
 Configured identity/main/origin/origin-main were inspected for the authorized Git
 publication; exact commit/push outcome follows without a status-only commit loop.
+
+Publication completed: commit `24036d5ca2a579586b96f1f0e18c2bebc317329b`
+(`Use provider-default output and safe Telegram display names`) contains the 16
+related reviewed public paths, including the synthetic `.env.example`. Normal
+SSH push to `git@github.com:nghlong3004/longnest.git`, `main:main`, succeeded;
+independent `ls-remote` confirms that exact commit at `refs/heads/main`, and local
+main/origin-main divergence is 0/0. Private env files and generated evidence were
+not staged; no force push or credential change occurred. This post-publication
+status record alone remains local, intentionally without another commit/amend.
 
 ### Environment preparation — completed 2026-10-23, local only
 

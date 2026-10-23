@@ -3,7 +3,6 @@ package me.nghlong3004.longnest.conversation;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Optional;
-import java.util.Locale;
 import java.util.Currency;
 import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +14,9 @@ import me.nghlong3004.longnest.domain.RangeFilter;
 import me.nghlong3004.longnest.domain.TransactionDraft;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.TransactionInterpreter;
+import me.nghlong3004.longnest.input.TransactionInterpreter.AmountlessCapture;
+import me.nghlong3004.longnest.input.InterpretationResult.FailureKind;
+import me.nghlong3004.longnest.input.InterpretationResult.Problem;
 import me.nghlong3004.longnest.ledger.adapter.LedgerClient;
 import me.nghlong3004.longnest.ledger.dto.LedgerResult;
 import me.nghlong3004.longnest.ledger.dto.TransactionPage;
@@ -36,6 +38,13 @@ public final class LedgerTools {
   public enum Period { TODAY, YESTERDAY, THIS_MONTH, LAST_MONTH, EXPLICIT, KEEP }
   public enum Scope { ALL, INCOME, EXPENSE, FOOD, KEEP }
   public enum Missing { AMOUNT, TYPE, DATES, TARGET, AMBIGUOUS, UNSUPPORTED }
+
+  /** Local clarification completion, not a model tool; shared create still owns authorization/replay. */
+  LedgerResult<?> completeAmount(HostContext host, AmountlessCapture facts, Money amount,
+      LocalDate date) {
+    var draft = new TransactionDraft(facts.type(), amount, facts.category(), facts.note());
+    return ledger.create(host, mapper.input(draft, date));
+  }
 
   static final class Turn {
     final HostContext host;
@@ -95,11 +104,33 @@ public final class LedgerTools {
       @ToolParam(required = false, description = "Only for EXPLICIT: financial date") String date,
       ToolContext context) {
     Turn turn = turn(context);
-    if (!Money.CURRENCY.equals(currency) || TransactionInterpreter.isQuery(turn.text)
-        || TransactionInterpreter.isUnsupportedFinance(turn.text)) {
+    if (!Money.CURRENCY.equals(currency) || TransactionInterpreter.isQuery(turn.text)) {
       throw new IllegalArgumentException("Unsupported capture");
     }
-    Money money = amount(turn, amount);
+    if (TransactionInterpreter.isUnsupportedFinance(turn.text)
+        || TransactionInterpreter.hasTransactionSeparator(turn.text)) {
+      turn.clarify(Missing.UNSUPPORTED);
+      return "handled";
+    }
+    if (TransactionInterpreter.isAmountOnly(turn.text)) {
+      turn.clarify(Missing.TYPE);
+      return "handled";
+    }
+    if (amount.isBlank() || turn.text.codePoints().noneMatch(Character::isDigit)) {
+      turn.clarify(Missing.AMOUNT);
+      return "handled";
+    }
+    if (new TransactionInterpreter().interpret(turn.text) instanceof Problem problem
+        && problem.failureKind() == FailureKind.VALIDATION) {
+      throw new IllegalArgumentException("Invalid source facts");
+    }
+    String asserted = turn.text.stripLeading();
+    if ((asserted.startsWith("-") && type != TransactionType.EXPENSE)
+        || (asserted.startsWith("+") && type != TransactionType.INCOME)
+        || TransactionInterpreter.hasConflictingSignedType(turn.text)) {
+      throw new IllegalArgumentException("Conflicting asserted type");
+    }
+    Money money = amount(turn, amount, true);
     LocalDate resolved = range(turn, period, date, date).from();
     if (period != Period.TODAY && period != Period.YESTERDAY && period != Period.EXPLICIT) {
       throw new IllegalArgumentException("Capture needs one date");
@@ -116,7 +147,7 @@ public final class LedgerTools {
     var target = revision(turn, id);
     if (target == null) return "handled";
     String replacement = switch (field) {
-      case AMOUNT -> amount(turn, value).canonicalAmount();
+      case AMOUNT -> amount(turn, value, false).canonicalAmount();
       case DATE -> range(turn, period, value, value).from().toString();
       default -> value;
     };
@@ -205,26 +236,40 @@ public final class LedgerTools {
     return null;
   }
 
-  private static Money amount(Turn turn, String value) {
+  private static Money amount(Turn turn, String value, boolean capture) {
     if (value == null || value.isBlank()) {
       throw new IllegalArgumentException("Literal current amount required");
     }
-    var literal = Pattern.compile("(?<![\\p{L}\\p{N}.,+\\-])" + Pattern.quote(value)
-        + "(?![\\p{L}\\p{N}.,])").matcher(turn.text);
+    String source = capture ? turn.text.replaceFirst("^ *[+\\-] *", "") : turn.text;
+    var literal = Pattern.compile("(?<![\\p{L}\\p{N}\\p{Pd}\\p{Sm}.,+\\-])" + Pattern.quote(value)
+        + "(?![\\p{L}\\p{N}\\p{Pd}\\p{Sm}.,+\\-])").matcher(source);
     if (!literal.find()) throw new IllegalArgumentException("Whole literal amount required");
-    String remainder = turn.text.substring(literal.end()).stripLeading();
+    String prefix = source.substring(0, literal.start()).stripTrailing();
+    if (prefix.matches("(?s).*[+*/=\\-\\p{Pd}\\p{Sm}]$")) {
+      throw new IllegalArgumentException("No signed or arithmetic fragment");
+    }
+    var prefixCurrency = Pattern.compile("(\\p{L}+|\\p{Sc})$")
+        .matcher(prefix);
+    if (prefixCurrency.find() && unsupportedCurrency(prefixCurrency.group(1))) {
+      throw new IllegalArgumentException("Unsupported currency");
+    }
+    String remainder = source.substring(literal.end()).stripLeading();
+    if (remainder.matches("(?s)^[+*/=\\-\\p{Pd}\\p{Sm}].*")) {
+      throw new IllegalArgumentException("No arithmetic fragment");
+    }
     if (remainder.matches("(?iu)^(?:nghìn|ngàn|triệu|k|tr)(?:\\b.*)?$")
         || remainder.matches("^[0-9].*")) throw new IllegalArgumentException("Incomplete amount");
     var currency = Pattern.compile("^(\\p{L}+|\\p{Sc})(?:\\b|$)").matcher(remainder);
-    if (currency.find() && (currency.group(1).codePoints()
-        .anyMatch(cp -> Character.getType(cp) == Character.CURRENCY_SYMBOL)
-        || Currency.getAvailableCurrencies().stream().anyMatch(c -> !c.getCurrencyCode().equals("VND")
-            && c.getCurrencyCode().equalsIgnoreCase(currency.group(1))))) {
+    if (currency.find() && unsupportedCurrency(currency.group(1))) {
       throw new IllegalArgumentException("Unsupported currency");
     }
     // Value conversion only, not a phrase parser: exact Vietnamese magnitude labels.
-    String normalized = value.toLowerCase(Locale.ROOT).replaceFirst(" *(nghìn|ngàn)$", "k")
-        .replaceFirst(" *triệu$", "tr");
-    return Money.parse(normalized);
+    return TransactionInterpreter.conversationAmount(value);
+  }
+
+  private static boolean unsupportedCurrency(String value) {
+    return value.codePoints().anyMatch(cp -> Character.getType(cp) == Character.CURRENCY_SYMBOL)
+        || Currency.getAvailableCurrencies().stream().anyMatch(c -> !c.getCurrencyCode().equals("VND")
+            && c.getCurrencyCode().equalsIgnoreCase(value));
   }
 }

@@ -21,6 +21,10 @@ import me.nghlong3004.longnest.ledger.dto.OperationRecovery;
 import me.nghlong3004.longnest.ledger.dto.TransactionView;
 import me.nghlong3004.longnest.ledger.model.HostContext;
 import me.nghlong3004.longnest.ledger.model.PersonalOwner;
+import me.nghlong3004.longnest.domain.Money;
+import me.nghlong3004.longnest.input.TransactionInterpreter;
+import me.nghlong3004.longnest.input.TransactionInterpreter.AmountlessCapture;
+import me.nghlong3004.longnest.input.InterpretationResult.Ready;
 import org.springframework.ai.chat.client.AdvisorParams;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.MessageChatMemoryAdvisor;
@@ -56,6 +60,8 @@ public final class ConversationAssistant {
   private final ChatClient client;
   private final ToolCallback[] callbacks;
   private final JsonMapper json;
+  private final LedgerTools tools;
+  private final TransactionInterpreter localInput = new TransactionInterpreter();
   private final ToolCallingManager manager = ToolCallingManager.builder()
       .maxCallsPerTool(1).maxTotalToolCalls(1).build();
   private final Semaphore turns = new Semaphore(1);
@@ -69,12 +75,115 @@ public final class ConversationAssistant {
     this.ledger = ledger;
     this.clock = clock;
     this.executor = executor;
+    this.tools = tools;
     this.memory = new ConversationMemory(clock);
     this.json = json.rebuild().enable(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
         .enable(DeserializationFeature.FAIL_ON_TRAILING_TOKENS).build();
     this.callbacks = ToolCallbacks.from(tools);
     this.client = ChatClient.builder(model).defaultAdvisors(
         MessageChatMemoryAdvisor.builder(memory).build()).build();
+  }
+
+  /** Handles only local amount clarification; empty means continue the existing adapter route. */
+  public Optional<Reply> amountCapture(HostContext host, String text, boolean ordinaryText,
+      Integer replyToMessage) {
+    owner.authorize(host);
+    if (host.operationId() == null || host.businessReference() == null
+        || host.interactionScope() == null || host.interactionScope().isBlank()) {
+      return Optional.of(message("conversation.AMBIGUOUS"));
+    }
+    String value = text == null ? "" : text.strip();
+    var facts = ordinaryText ? localInput.missingAmount(text) : Optional.<AmountlessCapture>empty();
+    boolean amountLike = value.matches("(?s)^[\\p{N}\\p{Sc}+.,\\-].*")
+        && value.matches("(?iu)(?:[\\p{N}\\p{Sc}+.,\\-*/()\\s]|k|tr|đ|vnd|usd|eur|nghìn|ngàn|triệu|e)+");
+    if (!ordinaryText || localInput.interpret(text) instanceof Ready
+        || (facts.isEmpty() && !amountLike)
+        || value.codePointCount(0, value.length()) > 256
+        || value.codePoints().anyMatch(Character::isISOControl)) {
+      memory.abandonAmount(conversationId(host));
+      return Optional.empty();
+    }
+    if (!turns.tryAcquire()) return Optional.of(message("conversation.busy"));
+    try {
+      if (modelRunning.get()) return Optional.of(message("conversation.busy"));
+      var state = memory.state(conversationId(host));
+      if (state.pendingAmount != null && !clock.instant().isBefore(state.pendingAmount.expiry())) {
+        state.pendingAmount = null;
+      }
+      if (state.amountAttempt != null
+          && !clock.instant().isBefore(state.amountAttempt.source().expiry())) {
+        state.amountAttempt = null;
+      }
+      // Unbound/incomplete input belongs to native interpretation, not a known-phrase gate.
+      if (facts.isEmpty() && state.pendingAmount == null && state.amountAttempt == null) {
+        return Optional.empty();
+      }
+      // A delivery retry must recover its frozen effect before inspecting ephemeral state/text.
+      var recovered = ledger.recoverOperation(host);
+      if (recovered instanceof LedgerResult.Failure<?> failure) {
+        return Optional.of(new Reply(failure, null));
+      }
+      var original = ((LedgerResult.Ok<Optional<OperationRecovery>>) recovered).data();
+      if (original.isPresent()) {
+        var operation = original.orElseThrow();
+        return Optional.of(new Reply(new LedgerResult.Ok<>(operation.receipt() != null
+            ? operation.receipt() : operation.preview()), null));
+      }
+      if (facts.isPresent()) {
+        if (state.amountSources.contains(host.operationId())) {
+          return Optional.of(message(state.pendingAmount != null
+              && state.pendingAmount.sourceEvent().equals(host.operationId())
+              ? "conversation.AMOUNT" : "conversation.captureAgain"));
+        }
+        state.pendingAmount = null;
+        state.amountAttempt = null;
+        state.amountQuestion = null;
+        // Bound source-event tombstones without evicting one and accidentally rearming a delivery.
+        if (state.amountSources.size() >= 8) {
+          return Optional.of(message("conversation.captureAgain"));
+        }
+        state.amountSources.add(host.operationId());
+        state.pendingAmount = new ConversationMemory.PendingAmount(host.operationId(), facts.get(),
+            host.businessReference().atZone(LedgerTools.ZONE).toLocalDate(),
+            clock.instant().plus(Duration.ofMinutes(10)));
+        return Optional.of(message("conversation.AMOUNT"));
+      }
+      var attempt = state.amountAttempt;
+      if (attempt == null || !attempt.event().equals(host.operationId())) {
+        if (state.pendingAmount == null) return Optional.empty();
+        if (replyToMessage != null && !replyToMessage.equals(state.amountQuestion)) {
+          return Optional.of(message("conversation.amountStale"));
+        }
+        Money amount;
+        try {
+          amount = TransactionInterpreter.conversationAmount(value);
+        } catch (IllegalArgumentException invalid) {
+          return Optional.of(message("conversation.AMOUNT"));
+        }
+        attempt = new ConversationMemory.AmountAttempt(host.operationId(), state.pendingAmount, amount);
+        state.amountAttempt = attempt;
+        state.pendingAmount = null;
+      }
+      var result = tools.completeAmount(host, attempt.source().facts(), attempt.amount(),
+          attempt.source().date());
+      if (result instanceof LedgerResult.Ok<?>) state.amountAttempt = null;
+      return Optional.of(new Reply(result, null));
+    } finally {
+      turns.release();
+    }
+  }
+
+  /** Binds only the current host-local amount question, never a model/tool confirmation. */
+  public void bindAmountQuestion(HostContext host, int messageId) {
+    owner.authorize(host);
+    if (!turns.tryAcquire()) return;
+    try {
+      if (modelRunning.get()) return;
+      var state = memory.state(conversationId(host));
+      if (state.pendingAmount != null && clock.instant().isBefore(state.pendingAmount.expiry())) {
+        state.amountQuestion = messageId;
+      }
+    } finally { turns.release(); }
   }
 
   public Reply reply(HostContext host, String text) {
@@ -84,7 +193,8 @@ public final class ConversationAssistant {
       return message("conversation.AMBIGUOUS");
     }
     if (text == null || text.isBlank() || text.codePointCount(0, text.length()) > 1024
-        || text.codePoints().anyMatch(Character::isISOControl)) {
+        || text.codePoints().anyMatch(cp -> Character.getType(cp) == Character.SURROGATE
+            || (Character.isISOControl(cp) && cp != '\n' && cp != '\r' && cp != '\t'))) {
       return message("conversation.AMBIGUOUS");
     }
     if (!turns.tryAcquire()) return message("conversation.busy");
@@ -209,6 +319,9 @@ public final class ConversationAssistant {
         no scope means clarify. Category/note filters other than FOOD are unsupported, clarify.
         For capture amount/note use literal CURRENT message values, never calculate/invent them.
         Category is optional (UNCATEGORIZED), but type/amount cannot be guessed. Bare 45 is 45 VND.
+        If current input is only an amount, clarify TYPE; never borrow a prior purchase's type/note.
+        Missing capture facts require clarification, never a fabricated placeholder or guessed amount.
+        Requests beyond installed tools (including multiple captures) must clarify UNSUPPORTED.
         Model tools only preview edits/request Delete. Actual Save/Confirm Delete/Cancel is never
         a tool and cannot be inferred from history or from the user's text claiming confirmation.
         Do not combine several actions or silently choose one part of a multi-action request.

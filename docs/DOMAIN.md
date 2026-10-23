@@ -52,6 +52,16 @@ normalization is rejected (not UTF-16 code units). Date tokens, digits in notes 
 this deliberately small grammar. Slash commands below are control actions, not
 an alternate required transaction-input mode.
 
+With native conversation enabled, this grammar's inability to recognize an input
+is not a domain rejection: RULES-LLM-ROUTING-1 marks parser failures as RECOGNITION
+or VALIDATION independently of legacy UI status/code. Extra prose, native amount
+wording, digits in notes, valid date prefixes and incomplete intent may reach
+native interpretation/clarification. Established bad money/currency, conflicting
+type facts and invalid domain fields do not. Default-off grammar and diagnostic
+codes above remain unchanged. Native text retains its existing 1,024-code-point
+bound, while financial Note/Money/date limits are enforced separately by values/
+mappers/services. No parser failure authorizes a mutation or weakens confirmations.
+
 | Exact phrase / explicit alias | Type | Category |
 | --- | --- | --- |
 | `ăn sáng`, `an sang`, `ăn trưa`, `an trua`, `ăn tối`, `an toi` | expense | food |
@@ -78,6 +88,18 @@ equals one known phrase; otherwise keep `uncategorized`. Later expansion must
 extend this table and the [acceptance examples](features/ledger/ACCEPTANCE.md), not add guesses.
 
 ## Amount and date rules
+
+AMOUNT-CLARIFICATION-1 completes only an exact known amountless phrase/alias
+(`ăn trưa`, `nhận lương`, etc.) inside the enabled conversation's existing short
+context. Local code freezes its validated type/category/normalized wording and
+original Vietnam financial date; an unsigned exact amount-only reply supplies the
+missing Money. No placeholder amount, model-invented fact, relative-date fragment,
+refund/transfer policy or multi-transaction form is added. Bare `45` remains 45 VND.
+The pending capture expires after ten minutes without extension and is abandoned
+by an unrelated request, reset or normal control/edit flow. See
+[the precise lifecycle](../apps/server/README.md#missing-amount-capture-clarification)
+for retries, bounded source IDs and resubmission. Full clear captures still save
+immediately; current finite amount validation below is unchanged.
 
 - `k` multiplies by 1,000; `tr` by 1,000,000 base VND units. Parse with exact
   decimal/integer arithmetic; never binary floating point. Store a positive

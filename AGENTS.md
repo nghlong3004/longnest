@@ -25,6 +25,12 @@ NATIVE-AI-1 supersedes those interpreters with default-off Spring AI native tool
 bounded memory and grounded dates/follow-ups, retaining shared service/confirmation
 controls. THIS_MONTH means month-to-date; FOOD means only Category.FOOD.
 This adds code/fake-provider authority, not live execution or egress.
+AMOUNT-CLARIFICATION-1 additionally covers local missing-amount completion inside
+that existing short-lived context, using validated phrase facts and shared create;
+no general pending workflow, new tool/schema or live effects.
+RULES-LLM-ROUTING-1 extends enabled routing to parser recognition failures,
+including legacy rejected grammar, without overriding financial validation,
+storage/auth/replay/proof failures or changing default-off parsing.
 No live messaging/data egress, paid/LLM calls, deployment, DB installation or broad
 infrastructure/credential changes. Inspected project baseline/increment Git stage,
 commit and push are authorized only with usable existing permissions and verified

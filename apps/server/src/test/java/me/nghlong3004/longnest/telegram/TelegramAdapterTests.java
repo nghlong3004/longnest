@@ -25,6 +25,8 @@ import java.util.Optional;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicBoolean;
 import me.nghlong3004.longnest.domain.Category;
+import me.nghlong3004.longnest.domain.DateRange;
+import me.nghlong3004.longnest.domain.RangeFilter;
 import me.nghlong3004.longnest.domain.TransactionType;
 import me.nghlong3004.longnest.input.TransactionInterpreter;
 import me.nghlong3004.longnest.input.InputInterpreter;
@@ -114,6 +116,152 @@ class TelegramAdapterTests {
     update.setUpdateId(id);
     update.setMessage(message);
     return update;
+  }
+
+  private void enableConversation(TelegramCapture capture, ChatModel provider,
+      SimpleAsyncTaskExecutor executor) {
+    try (var validators = Validation.buildDefaultValidatorFactory()) {
+      var mapper = new TransactionMapper(validators.getValidator(),
+          Mappers.getMapper(TransactionRepresentationMapper.class));
+      capture.setConversation(new ConversationAssistant(provider, new PersonalOwner("personal"),
+          ledger, Clock.fixed(SOURCE, ZoneOffset.UTC), executor,
+          new LedgerTools(ledger, mapper), JsonMapper.builder().build()));
+    }
+  }
+
+  private ChatModel proposing(String tool, String arguments) {
+    var provider = mock(ChatModel.class);
+    when(provider.getOptions()).thenReturn(DeepSeekChatOptions.builder().build());
+    when(provider.call(any(Prompt.class))).thenReturn(new ChatResponse(List.of(new Generation(
+        AssistantMessage.builder().content("").toolCalls(List.of(new AssistantMessage.ToolCall(
+            "proposal", "function", tool, arguments))).build(),
+        ChatGenerationMetadata.builder().finishReason("tool_calls").build()))));
+    when(ledger.recoverOperation(any())).thenReturn(new LedgerResult.Ok<>(Optional.empty()));
+    return provider;
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ăn trưa hết 45k", "ăn trưa 45 nghìn", "45 nghìn cho bữa trưa",
+      "-45k đồ dùng phòng 2", "2026-10-22 ăn trưa 45k", "45nghìn cho bữa trưa",
+      "ăn trưa 45,5 triệu", "45000 vnd cho bữa trưa"})
+  void grammarFailuresReachNativeInterpretationAndValidatedCreate(String text) throws Exception {
+    String note = text.contains("phòng") ? "đồ dùng phòng 2"
+        : text.contains("bữa") ? "bữa trưa" : "ăn trưa";
+    String amount = text.contains("45nghìn") ? "45nghìn"
+        : text.contains("45,5 triệu") ? "45,5 triệu"
+        : text.contains("45000 vnd") ? "45000 vnd"
+        : text.contains("nghìn") ? "45 nghìn" : "45k";
+    String period = text.startsWith("2026-") ? "EXPLICIT" : "TODAY";
+    String date = period.equals("EXPLICIT") ? ",\"date\":\"2026-10-22\"" : "";
+    String arguments = """
+        {"type":"EXPENSE","amount":"%s","currency":"VND","category":"UNCATEGORIZED",
+         "note":"%s","period":"%s"%s}
+        """.formatted(amount, note, period, date);
+    var provider = proposing("create_transaction", arguments);
+    var capture = capture();
+    when(ledger.create(any(), any())).thenAnswer(call ->
+        new LedgerResult.Ok<>(receipt(call.getArgument(0), call.getArgument(1), false)));
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, text));
+      verify(provider).call(any(Prompt.class));
+      var input = ArgumentCaptor.forClass(TransactionInput.class);
+      verify(ledger).create(any(), input.capture());
+      assertThat(input.getValue().amountMinor()).isEqualTo(text.contains("45,5 triệu")
+          ? "45500000" : "45000");
+      assertThat(input.getValue().note()).contains(note);
+      assertThat(input.getValue().type()).isEqualTo(TransactionType.EXPENSE);
+      if (period.equals("EXPLICIT")) {
+        assertThat(input.getValue().transactionDate()).contains("2026-10-22");
+      }
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"mình vừa ăn bún", "ăn trưa hết", "45k",
+      "ăn trưa 45k; cà phê 20k", "xem thu\nchi tháng này"})
+  void unresolvedOrUnsupportedIntentReachesClarificationWithoutMutation(String text) throws Exception {
+    String missing = text.equals("45k") ? "TYPE" : text.contains(";") ? "UNSUPPORTED" : "AMOUNT";
+    var provider = proposing("clarify", "{\"missing\":\"" + missing + "\"}");
+    var capture = capture();
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, text));
+      verify(provider).call(any(Prompt.class));
+      verify(ledger, never()).create(any(), any());
+      verify(client).execute(any(SendMessage.class));
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"ăn trưa 0", "ăn trưa 45.000", "ăn trưa 1000000000001",
+      "-45k USD đồ dùng", "ăn trưa 45k USD", "+45k ăn trưa", "ăn trưa\u0000",
+      "mình chi −45k cho bữa trưa", "+45k ăn trưa quán 2", "-45k lương công ty 2",
+      "ăn trưa 45,5 triệu USD", "ăn trưa 1000000000000 triệu", "ăn trưa 0.001 triệu"})
+  void authoritativeInvalidFactsStayLocalWithConversationEnabled(String text) throws Exception {
+    var provider = mock(ChatModel.class);
+    var capture = capture();
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, text));
+      verifyNoInteractions(provider);
+      verify(ledger, never()).create(any(), any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"mình vừa ăn bún", "45k", "mình trả USD 45k cho bữa trưa",
+      "mình trả $45k cho bữa trưa", "ăn trưa 45k; cà phê 20k",
+      "mình chi 45k+10k", "mình chi 45k + 10k", "ăn trưa 45k\u2028cà phê 20k",
+      "ăn trưa 45k\u2029cà phê 20k"})
+  void badModelCannotInventMissingFactsOrStripCurrencyOrSaveOnePart(String text) throws Exception {
+    var provider = proposing("create_transaction", """
+        {"type":"EXPENSE","amount":"45k","currency":"VND","category":"FOOD",
+         "note":"","period":"TODAY"}
+        """);
+    var capture = capture();
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, text));
+      verify(provider).call(any(Prompt.class));
+      verify(ledger, never()).create(any(), any());
+    }
+  }
+
+  @Test
+  void nativeClarificationAsksForMissingFactsRatherThanNarratingASave() throws Exception {
+    var provider = proposing("create_transaction", """
+        {"type":"EXPENSE","amount":"45k","currency":"VND","category":"FOOD",
+         "note":"","period":"TODAY"}
+        """);
+    var capture = capture();
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, "mình vừa ăn bún"));
+      capture.handle(update(10, "45k"));
+      var sent = ArgumentCaptor.forClass(SendMessage.class);
+      verify(client, times(2)).execute(sent.capture());
+      assertThat(sent.getAllValues().get(0).getText()).contains("bao nhiêu tiền");
+      assertThat(sent.getAllValues().get(1).getText()).contains("khoản thu hay khoản chi");
+      verify(ledger, never()).create(any(), any());
+    }
+  }
+
+  @ParameterizedTest
+  @ValueSource(strings = {"xem\tchi tháng này", "xem chi\u2028tháng này"})
+  void safeQuestionWhitespaceReachesNativeReadWithoutMutations(String text) throws Exception {
+    var provider = proposing("list_transactions", "{\"period\":\"THIS_MONTH\",\"scope\":\"EXPENSE\"}");
+    var capture = capture();
+    when(ledger.list(any(), any(), any(), any())).thenReturn(new LedgerResult.Ok<>(
+        new TransactionPage("recent", List.of(), 10, "0", Optional.empty(), Optional.empty())));
+    try (var executor = new SimpleAsyncTaskExecutor(Thread.ofVirtual().factory())) {
+      enableConversation(capture, provider, executor);
+      capture.handle(update(9, text));
+      verify(provider).call(any(Prompt.class));
+      verify(ledger).list(any(), eq(DateRange.parse("2026-10-01", "2026-10-20")),
+          eq(RangeFilter.EXPENSE), eq(Optional.empty()));
+      verify(ledger, never()).create(any(), any());
+    }
   }
 
   @Test
