@@ -10,7 +10,6 @@ fail() { printf 'dev-server: %s\n' "$1" >&2; exit 1; }
 mapfile -d '' inherited_environment < <(env -0)
 repo_root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd -P)
 env_path="$repo_root/.env.dev"
-jar_path="$repo_root/apps/server/target/longnest-0.0.1-SNAPSHOT.jar"
 [[ -f "$env_path" && -r "$env_path" ]] || fail 'Repository-root .env.dev must be a readable regular file.'
 
 # Read once and reject NUL rather than letting Bash silently discard it.
@@ -69,8 +68,22 @@ effective LONGNEST_DEV_DB_NAME
 [[ -z "$REPLY" || "$REPLY" == "$dev_database" ]] || fail 'Conflicting managed database name.'
 effective DOCKER_HOST
 [[ -z "$REPLY" || "$REPLY" == unix://* ]] || fail 'Managed dev PostgreSQL requires a local Docker endpoint.'
-# Resolve tools before applying file environment (e.g. PATH).
-java_path=$(type -P java) || fail 'Java 25 must be available on the inherited PATH.'
+# Select one installed JDK without executing SDKMAN/project configuration.
+effective JAVA_HOME
+if [[ -n "$REPLY" ]]; then
+  dev_java_home=$(cd -- "$REPLY" 2>/dev/null && pwd -P) \
+    || fail 'JAVA_HOME must point to an installed Java 25 JDK.'
+  java_path="$dev_java_home/bin/java"
+  [[ -x "$java_path" ]] || fail 'JAVA_HOME must point to an installed Java 25 JDK.'
+else
+  java_path=$(type -P java) || fail 'Java 25 must be available on the inherited PATH.'
+  java_path=$(readlink -f -- "$java_path")
+  dev_java_home=$(dirname -- "$(dirname -- "$java_path")")
+fi
+[[ -x "$dev_java_home/bin/javac" ]] || fail 'The selected Java installation must include javac (JDK required).'
+java_version=$("$java_path" -version 2>&1) || fail 'Cannot inspect the selected Java installation.'
+[[ "$java_version" =~ version[[:space:]]+\"25([.+\"-]) ]] \
+  || fail 'The selected installed Java must be version 25.'
 maven_path=$(type -P mvn) || fail 'Maven must be available on the inherited PATH.'
 flock_path=$(type -P flock) || fail 'flock (util-linux) must be available on the inherited PATH.'
 docker_path=$(type -P docker) || fail 'Docker Engine and Compose must already be available.'
@@ -79,19 +92,24 @@ compose_timeout=30
 # Never unlink this lock file while a launcher/application may still hold it.
 exec 9>"$repo_root/.dev-server.lock"
 "$flock_path" -n 9 || fail 'Another dev launcher/backend is already running for this checkout.'
+printf 'dev-server: Configuration loaded; installed Java 25 selected.\n' >&2
 
-docker_cli() (
+exec_with_env() {
   # Freeze controls before importing arbitrary env names; positional parameters cannot collide.
   set -- "${inherited_environment[@]}" "${assignments[@]}" "LONGNEST_DEV_DB_NAME=$dev_database" \
-    -- "$timeout_path" --foreground --kill-after=2 "$compose_timeout" "$docker_path" "$@"
+    "JAVA_HOME=$dev_java_home" "PWD=$PWD" "LONGNEST_DEV_PREPARE_LEDGER=true" -- "$@"
   unset inherited_environment inherited file_values assignments container_lines container_env
   # Builtin export keeps private values out of process arguments, with no script array attributes.
   while [[ "$1" != -- ]]; do
-    export "$1" 2>/dev/null || fail 'Cannot preserve Docker command environment.'
+    export "$1" 2>/dev/null || fail 'Cannot preserve command environment.'
     shift
   done
   shift
   exec "$@"
+}
+
+docker_cli() (
+  exec_with_env "$timeout_path" --foreground --kill-after=2 "$compose_timeout" "$docker_path" "$@"
 )
 
 compose() {
@@ -124,6 +142,7 @@ inspect_postgres() {
 }
 
 prepare_postgres() {
+  printf 'dev-server: Checking development PostgreSQL configuration.\n' >&2
   docker_endpoint=$(docker_cli context inspect --format '{{.Endpoints.docker.Host}}' 2>/dev/null) \
     || fail 'Cannot inspect Docker context; Docker Engine must already be available.'
   [[ "$docker_endpoint" == unix://* ]] || fail 'Managed dev PostgreSQL requires a local Docker context.'
@@ -133,6 +152,7 @@ prepare_postgres() {
   container_state=''
   inspect_postgres
   if [[ -z "$container_id" || "$container_state" == exited || "$container_state" == created ]]; then
+    printf 'dev-server: Starting development PostgreSQL without recreation (up to 180s).\n' >&2
     compose_timeout=180 # Allow a bounded initial image pull without changing host infrastructure.
     compose up -d --no-recreate postgres >/dev/null 2>&1 \
       || fail 'Cannot start dev PostgreSQL; check Docker access, port and image availability.'
@@ -142,9 +162,11 @@ prepare_postgres() {
   [[ -n "$container_id" && "$container_state" == running ]] \
     || fail 'Dev PostgreSQL is not running; no reset or recreation attempted.'
   ready_deadline=$((SECONDS + 60))
+  printf 'dev-server: Waiting for PostgreSQL readiness (up to 60s).\n' >&2
   while (( SECONDS < ready_deadline )); do
     compose_timeout=$((ready_deadline - SECONDS))
     if ready_output=$(compose exec -T postgres pg_isready -U "$dev_user" -d "$dev_database" 2>/dev/null); then
+      printf 'dev-server: PostgreSQL ready.\n' >&2
       return 0
     else
       ready_status=$?
@@ -155,51 +177,8 @@ prepare_postgres() {
   done
   fail 'PostgreSQL readiness deadline exceeded; backend not started.'
 }
+prepare_postgres
 cd -- "$repo_root/apps/server"
-# A separate job group lets INT/TERM stop Maven and its test JVMs, not just this shell.
-stop_build() {
-  trap '' INT TERM
-  if [[ -n "${build_pid:-}" ]]; then
-    kill -s "$1" -- "-$build_pid" 2>/dev/null || :
-    kill -CONT -- "-$build_pid" 2>/dev/null || :
-    wait -f "$build_pid" || :
-  fi
-  printf 'dev-server: %s interrupted; backend not started.\n' "$phase_label" >&2
-  exit "$2"
-}
-run_phase() {
-  phase_label=$1
-  shift
-  build_pid=''
-  trap 'stop_build INT 130' INT
-  trap 'stop_build TERM 143' TERM
-  set -m
-  "$@" &
-  build_pid=$!
-  # With job control, plain wait can report a stop instead of process termination.
-  if wait -f "$build_pid"; then phase_status=0; else phase_status=$?; fi
-  trap - INT TERM
-  set +m
-}
-# Do not give file-loaded runtime values to Maven, including tests/plugins.
-run_phase Build env -i -- "${inherited_environment[@]}" "PWD=$repo_root/apps/server" \
-  "$maven_path" -B -ntp package
-build_status=$phase_status
-if (( build_status != 0 )); then
-  printf 'dev-server: Maven package failed; backend not started. Exit status: %s.\n' "$build_status" >&2
-  exit "$build_status"
-fi
-[[ -f "$jar_path" && -r "$jar_path" ]] || fail 'Maven package did not produce the expected readable executable JAR.'
-cd -- "$repo_root"
-run_phase 'PostgreSQL startup' prepare_postgres
-if (( phase_status != 0 )); then exit "$phase_status"; fi
-# Migrate/validate and prepare in a separate one-shot process with both integrations excluded.
-run_phase 'Ledger preparation' env -i -- "${inherited_environment[@]}" "${assignments[@]}" \
-  "PWD=$repo_root" "$java_path" -jar "$jar_path" --spring.profiles.active=ledger-init \
-  --longnest.ledger.initialize-if-absent=true
-if (( phase_status != 0 )); then
-  printf 'dev-server: Ledger preparation failed; backend not started. Inspect storage before retry.\n' >&2
-  exit "$phase_status"
-fi
-exec env -i -- "${inherited_environment[@]}" "${assignments[@]}" "PWD=$repo_root" \
-  "$java_path" -jar "$jar_path" --spring.profiles.active=ledger
+printf 'dev-server: Starting foreground Maven/one application; runtime env reaches Maven/plugins.\n' >&2
+# Only this dev path opts into the early database-ready bean; command profiles remain ledger.
+exec_with_env "$maven_path" -B -ntp spring-boot:run -Dspring-boot.run.profiles=ledger

@@ -1,7 +1,5 @@
 # Opt-in unfinished ledger wiring; this profile does not grant database execution authority.
 spring:
-  flyway:
-    locations: classpath:db/ledger
   jpa:
     properties:
       hibernate:

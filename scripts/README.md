@@ -1,203 +1,154 @@
 # Backend development launcher
 
-`dev-server.sh` is a host-side development launcher, not a safe smoke command or
-production provisioning tool. It requires Bash 4.4+, GNU `env`/`timeout`, util-linux
-`flock`, Java 25, Maven and Docker Engine with Compose on inherited `PATH`.
-Docker's local Unix-socket daemon must already be available; the script never
-installs tools, starts the daemon or changes host permissions. One command builds/
-tests, ensures the dev PostgreSQL service is running/ready, migrates/prepares the
-configured ledger owner, then runs the backend. No operator JAR handling is needed.
-The small root `scripts/` directory separates host tooling from Java and Compose.
-
-## Usage
-
-With private `.env.dev` configured as below, and **only with separately authorized
-database/container connection/migration scope** (and Telegram/provider authority
-if those integrations are enabled):
+One operator command, from root or any working directory:
 
 ```sh
-# From the repository root:
-bash scripts/dev-server.sh
-
-# From any other directory (use the actual repository path):
 bash /home/nghlong3004/projects/longnest/scripts/dev-server.sh
+# Equivalent from the repository root:
+bash scripts/dev-server.sh
 ```
 
-The launcher resolves root relative to itself and validates **only root `.env.dev`**.
-It runs `mvn -B -ntp package` from `apps/server`, with tests enabled. On success it
-prepares PostgreSQL, then runs the packaged JAR once with `ledger-init` and internal
-`--longnest.ledger.initialize-if-absent=true`. That process migrates/validates and
-commits owner preparation, excludes both integrations, and exits. Only a zero exit
-allows the launcher to exec the same JAR under `ledger`. No arguments, extra mode,
-manual exports, profile edits or separate init command are required.
-This follows the repository's documented installed-Maven convention (3.10.0 in
-the verified environment), avoiding wrapper distribution download/bootstrap and
-a long-lived Maven parent for the application. No `clean`, test-skipping,
-dependency prefetch or install goal is added. Normal Maven dependency/plugin
-resolution can require repository access on a cold cache; inherited Maven
-configuration remains operator-controlled. The launcher does not install tools.
+This is a real development startup command, not a smoke check. Execution requires
+operator authority for containers/database access and any enabled integrations.
+Implementation verification never runs the real launcher or private env files.
 
-File-loaded values, including secrets and any MAVEN_OPTS/JAVA_HOME/PATH keys, are
-**not supplied to Maven**; only its original inherited environment is passed.
-Already exported values still reach Maven, so keep runtime secrets in the private
-file when they need not be exposed to build plugins/tests. Missing config/tools
-fail before the build. Build failure returns Maven's exit code without launching
-Java, even if an older JAR exists; successful packaging must provide a readable
-artifact at the expected path. There is no prebuilt-JAR shortcut/failure fallback.
-The artifact path is currently `apps/server/target/longnest-0.0.1-SNAPSHOT.jar`;
-update it if the Maven artifact/version changes. Java's exit status and signals
-are preserved without a remaining parent-shell wrapper; Ctrl-C stops that process.
-During packaging, DB startup and preparation, INT/TERM is forwarded to the current
-process group; interruption stops before normal backend startup (exit130/143).
-If PostgreSQL was already started, interruption/failure does not remove or stop it.
-Run in the foreground; backgrounding from a shell
-that ignores SIGINT has that shell's normal inherited-signal limitations.
+## Prerequisites
 
-A readable `.env.dev` is required even when values are supplied via exported
-environment. Users manage that private file themselves; never commit it, paste
-secrets into chat, or run this launcher with shell tracing. The tracked root
-[.env.example](../.env.example) lists current backend and default-off integration
-settings. Copy it to `.env.dev` only if that private file is absent; otherwise
-merge deliberately without overwriting existing values. Root `.env` is a separate
-prepared file and is still not loaded by this launcher. Safe **synthetic-only**
-example content, matching the disposable [dev database](../deploy/README.md):
+Bash4.4+, GNU env/readlink/timeout, util-linux flock, installed Maven, an installed
+Java25 JDK including javac, and Docker Engine with Compose must already be available.
+Docker must be running on a local Unix-socket context. No daemon startup, permission
+changes, SDKMAN discovery/activation, wrapper bootstrap, download/install command
+or global configuration change is implemented. Maven may resolve dependencies
+from repositories on a cold cache; this script does not prefetch or install them.
+
+Configure root `.env.dev` using the tracked [.env.example](../.env.example), copying
+only if that private file is absent; otherwise merge privately. `.env.dev` is required
+even if settings are exported. Root `.env` is separate and never loaded. Never
+commit private values, enable shell tracing or paste private configuration/logs.
+
+## Exact sequence and visible progress
+
+1. Parse root `.env.dev` literally, with inherited exports winning even if empty.
+   Require datasource URL/user/password and stable LONGNEST_LEDGER_OWNER. Select
+   effective JAVA_HOME when nonempty, otherwise resolve Java on inherited PATH.
+   Check executable java/javac and Java major25, then pass the selected JAVA_HOME
+   consistently to Docker and Maven. Invalid explicit JAVA_HOME fails; no silent
+   fallback. File PATH does not choose the initially resolved executables, but can
+   affect subprocess helpers just like other trusted runtime configuration.
+2. Acquire an ignored `.dev-server.lock` with nonblocking flock. A second launcher
+   in the same checkout fails immediately; do not unlink the file while held.
+3. Print `Checking development PostgreSQL configuration`. Check local Docker
+   context, Compose image/service state and existing container configuration.
+   Absent or matching stopped service prints `Starting development PostgreSQL`
+   and uses `up -d --no-recreate postgres`. Running service is not restarted for
+   failed readiness. Image, port, mount, PGDATA or bootstrap DB/user/password
+   mismatch fails without reset/reconfiguration. Docker errors are not absence.
+4. Print `Waiting for PostgreSQL readiness`, poll with a60-second deadline, then
+   print `PostgreSQL ready`. Docker calls normally allow30 seconds; initial
+   start/image pull allows180; forced-kill grace is2 seconds. Pull/inspection/raw
+   readiness output is suppressed to avoid private values, but phase labels remain
+   visible. `pg_isready` is not authentication proof; real connection follows.
+5. Change to actual `apps/server`, print `Starting foreground Maven/one application`,
+   and exec installed `mvn -B -ntp spring-boot:run -Dspring-boot.run.profiles=ledger`.
+   Its internal LONGNEST_DEV_PREPARE_LEDGER=true env enables the readiness bean; no operator
+   mode, profile editing, exports or JAR handling is required. There is no mandatory
+   package, Surefire test run, JAR repackage or separate preparation JVM. The pinned
+   goal runs through test-compile, so source/test compilation and dependency
+   resolution may still take time. Maven remains parent of one application JVM.
+6. In that single Spring startup, Flyway initializes and Hibernate validates.
+   The dev-only LedgerReady bean then calls existing proxied prepareOwner, logging
+   preparation/ready messages. Both integration factories explicitly request that
+   bean before constructing clients; Telegram lifecycle registration cannot start
+   ahead of it. An ApplicationRunner alone would be too late. Exactly one matching
+   owner is accepted unchanged, or generation zero is created only under all-five-
+   table empty checks, exclusive locks and required durability. Migration/schema/
+   query/owner/uncertain-commit failures abort startup, never become fresh storage.
+
+Direct ordinary runtime without the internal dev flag remains non-seeding.
+Default-off integrations, shared authorization, actual-user confirmations, short
+memory and one-tool policy are unchanged. Diagnostic strict ledger-init remains
+available but is not used by this launcher. No schema/dependency is added.
+
+## Configuration and Compose contract
 
 ```dotenv
 SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:54329/longnest_dev
 SPRING_DATASOURCE_USERNAME=longnest_dev
 SPRING_DATASOURCE_PASSWORD=longnest_dev_only
 LONGNEST_LEDGER_OWNER=synthetic-dev-owner
-# Optional; omission selects ledger. No dev profile exists in the application.
 SPRING_PROFILES_ACTIVE=ledger
+LONGNEST_TELEGRAM_ENABLED=false
+LONGNEST_DEEPSEEK_ENABLED=false
 ```
 
-The first four names are required and must be nonblank after precedence. They
-bind `spring.datasource.url/username/password` and `longnest.ledger.owner`;
-application validation still checks the actual owner/values. If present, the
-effective `SPRING_PROFILES_ACTIVE` must be exactly `ledger`, not `smoke`, `dev`
-or a list. The launcher explicitly selects that existing profile on the Java
-command line; it does not add a new dev profile or alter YAML/JPA/Flyway settings.
-Required URL shape is exactly `jdbc:postgresql://127.0.0.1:54329/NAME`, with NAME
-and username matching `[A-Za-z_][A-Za-z0-9_]{0,62}`. Remote URLs, other ports, query
-options and conflicting `LONGNEST_DEV_DB_NAME` fail before build/Docker. Database
-name is derived from that URL, not a second operator setting. Compose interpolates
-the same effective datasource username/password; bare `POSTGRES_*` env values do
-not configure the app. Keep a stable owner across launches. Root `.env.example`
-uses synthetic defaults, not mandatory names/passwords. Do not use real finance
-data with this disposable storage.
+These are synthetic disposable defaults, not real financial-data storage. URL must
+be exactly `jdbc:postgresql://127.0.0.1:54329/NAME` without query options; NAME and
+username match `[A-Za-z_][A-Za-z0-9_]{0,62}`. Database name is derived internally as
+LONGNEST_DEV_DB_NAME, not a second required setting. Explicit conflicting values
+fail. Bare POSTGRES_* vars are not alternate app configuration. Effective
+SPRING_PROFILES_ACTIVE must be exactly ledger if supplied.
 
-Compose calls use absolute paths equivalent to:
+All Compose calls use `docker compose --env-file <absolute-root>/.env.dev
+-p longnest-dev -f <absolute-root>/deploy/compose.dev.yaml`. The same effective
+datasource username/password enter declared container environment; readiness is
+`exec -T postgres pg_isready -U <effective-user> -d <derived-name>`. No service
+env_file forwards Telegram/DeepSeek values into PostgreSQL. See
+[storage/stop/resume limits](../deploy/README.md).
 
-```text
-docker compose --env-file <root>/.env.dev -p longnest-dev -f <root>/deploy/compose.dev.yaml ...
-```
+Optional Telegram names are LONGNEST_TELEGRAM_ENABLED/TOKEN/USER; optional native
+conversation names are LONGNEST_DEEPSEEK_ENABLED/API_KEY/BASE_URL/MODEL. Exact
+placeholders, required direct endpoint and integration limits are in
+[.env.example](../.env.example) and [the server guide](../apps/server/README.md).
 
-The launcher supplies effective file/inherited values through the command environment,
-without password/token arguments or full Compose-config output. It checks a local
-Docker context, inspects service/container state and compares image, published port,
-PGDATA/mount policy and bootstrap DB/user/password before reuse. Absent or matching
-stopped service starts with `up -d --no-recreate postgres`; running service is not
-restarted/recreated for failed readiness. Mismatch, Docker access/config/exec errors,
-unsupported state or failed startup stops clearly. Readiness uses
-`exec -T postgres pg_isready -U <effective-user> -d <derived-name>` with a 60-second
-deadline; Docker calls use 30-second timeouts (180 for initial start/image pull)
-and a 2-second forced-kill grace. Passwords/inspection contents are not
-printed. `pg_isready` is not authentication proof: preflight's real connection is.
+## Environment grammar and selected propagation tradeoff
 
-Preflight runs Flyway from `db/ledger`, Hibernate validation, then a proxied
-transaction taking exclusive locks on all five ledger tables. Exactly one matching
-owner is accepted unchanged; a generation-zero owner is inserted only when every
-ledger table is empty and fsync/synchronous_commit are on. Foreign/multiple owners,
-headless nonempty state, query/connection/migration/durability or failed/uncertain
-commit cannot seed or launch integrations. No error is reclassified as fresh
-storage and no data is reset/deleted. Concurrent preflights serialize in PostgreSQL.
-The default standalone runtime still never auto-seeds; explicit diagnostic init
-remains compatible but is no longer a dev prerequisite.
+Low to high: application defaults → literal `.env.dev` → already-exported env.
+The launcher pins the chosen JAVA_HOME, actual PWD, derived DB name and internal
+LONGNEST_DEV_PREPARE_LEDGER=true. Other Maven/JVM/Spring configuration is trusted operator input, not an
+authorization boundary; toolchains can affect Maven's application-JDK selection.
 
-An ignored `.dev-server.lock` holds a kernel lock from before build through final
-Java shutdown, refusing a second launcher in the same checkout. Do not remove the
-file while a process holds it. This is not cross-checkout/distributed bot exclusion;
-one operator/process must own the bot. Ctrl-C stops backend resources, not PostgreSQL.
-Storage persists across stop/start/restart of the same container, but container
-removal/recreation loses it; see [storage lifecycle](../deploy/README.md).
-These implemented checks do not establish real DB durability or live bot readiness.
+Unlike the previous package/JAR launcher, loaded runtime values deliberately reach
+Maven/plugins and its child JVM. This is the selected simpler-dev-path tradeoff,
+not a guarantee that plugins cannot read or log secrets. Avoid verbose/debug/
+prompt/body/environment logging and untrusted plugins; no values are printed by
+the launcher. No private file was read/edited during implementation checks.
 
-### Optional Telegram configuration
+Literal grammar remains: one case-sensitive NAME=value per line; blank lines and
+whole-line comments allowed; LF/CRLF/no final newline supported. No duplicates,
+export prefix, inline comments, BOM, NUL, controls, backslashes, multiline, escapes
+or evaluation. Bare values contain no whitespace/quotes/#. Whole single/double
+quotes preserve spaces, Unicode, #, = and the opposite quote literally, not the
+matching quote. Dollar signs/backticks are literal, never interpolated/executed.
+Invalid lines fail even when exported values override them. Do not source the file.
 
-The backend now has an opt-in TelegramBots SDK capture/get/recent adapter; exact
-candidate acceptance and unverified runtime limits are in
-[CURRENT STATUS](../docs/WORK_STATUS.md). It is disabled unless
-`LONGNEST_TELEGRAM_ENABLED=true`. Only for a separately authorized live session,
-provide these names in root `.env.dev` or the inherited environment:
+## Shutdown and verification limits
 
-- `LONGNEST_TELEGRAM_ENABLED`: `true` to opt in; otherwise omit or use `false`.
-- `LONGNEST_TELEGRAM_TOKEN`: private token supplied by the operator, never committed
-  or pasted into chat; a placeholder is not a usable token.
-- `LONGNEST_TELEGRAM_USER`: the one allowed positive numeric Telegram user ID,
-  not a username or the application owner string.
+There is no background job-control phase runner or wait-f loop. Foreground Ctrl-C
+reaches the normal process group; Maven's plugin owns its application child and
+shutdown hook. Normal signal/child exit/lock release is checked using fake commands.
+The application closes inference admission on context close, drains Telegram handling
+for up to five seconds, then requests cancellation and SDK/HTTP cleanup. Boot's
+phase budget is 20 seconds, with a five-second executor termination setting.
+These are cooperative limits, not a guaranteed process deadline or live signal proof;
+see [application shutdown](../apps/server/README.md#opt-in-telegram-sdk-boundary).
+The pinned plugin calls destroy then waits, without forced escalation: an externally
+SIGSTOPped/unresponsive child can still stall shutdown; SIGKILL of Maven can orphan
+a child and release its lock. Confirm old processes are stopped before restarting;
+do not treat a stale lock filename as a live lock or delete it to bypass exclusion.
+No cross-checkout/distributed bot lease or overall Maven/startup deadline is added.
 
-These bind `longnest.telegram.enabled/token/user`. The already-required
-`LONGNEST_LEDGER_OWNER` is the internal principal, supplied only after the adapter
-authenticates that user's non-bot private-chat message. Launcher loading and
-inherited-env precedence apply unchanged; direct Spring/Java startup does not
-read `.env.dev`. Compose does not inject Telegram settings into PostgreSQL. Enabled
-startup contacts Telegram and PostgreSQL; do not run it as a synthetic smoke.
-No token, user identity, live startup or Telegram message has been configured here.
+Ctrl-C or startup failure does not stop/remove PostgreSQL. Same-container stop/
+start/restart preserves data; removal/recreation loses this disposable cluster.
 
-## Exact loading contract and precedence
-
-The same literal loader also supports the optional `LONGNEST_DEEPSEEK_ENABLED`,
-`LONGNEST_DEEPSEEK_API_KEY`, `LONGNEST_DEEPSEEK_BASE_URL` and
-`LONGNEST_DEEPSEEK_MODEL` names. No values are provided or private file edited here.
-The [server fallback documentation](../apps/server/README.md#opt-in-deepseek-capture-fallback)
-defines required settings, timeout/recovery limits and separate live egress/spend
-approval. Omission keeps deterministic interpretation; this launcher grants no
-provider permission. Compose does not forward these names into PostgreSQL.
-Native conversation leaves output-token limits unset for provider/model defaults;
-legacy DEEPSEEK_MAX_TOKENS is not mapped. Output length/cost are not guaranteed.
-
-Low → high: existing application defaults → literal `.env.dev` values → already
-exported process environment. An exported empty value wins, so an empty required
-value fails rather than falling back. `.env` is **never read**; no base/dev merge,
-automatic Spring dotenv support or production secret loader is implemented.
-Other exported/JVM/Spring configuration remains trusted operator input; this is
-not an environment sanitizer or an authorization boundary. The Java executable
-is resolved from inherited PATH before applying file values (not JAVA_HOME or
-file PATH); other file variables are passed into its environment when not exported.
-
-The deliberately small dotenv grammar is **not shell or full dotenv syntax**:
-
-- One `NAME=value` per line; names match `[A-Za-z_][A-Za-z0-9_]*`. Outer spaces/tabs
-  around the assignment/value are allowed; names are case-sensitive, duplicates fail.
-- Blank lines and whole-line `#` comments are allowed; LF/CRLF and no final newline
-  are supported. No inline comments, `export` prefix, BOM, NUL or control characters.
-- Bare values contain no whitespace, quote, backslash or `#`; empty is allowed.
-  Single- or double-quoted whole values preserve spaces, Unicode, `#`, `=` and the
-  opposite quote literally. The matching quote cannot appear inside the value.
-- No escapes/backslashes, multiline values, variable interpolation, command
-  substitution or evaluation. `$HOME`, `$(...)` and backticks inside quotes are
-  literal text, never executed. Invalid lines fail even if process values override
-  them. Diagnostics identify line numbers or required names, not file values.
-
-Use the grammar above even if a different dotenv tool accepts broader syntax.
-The launcher does not silently execute a shell-compatible env file.
-
-## Synthetic verification (no real env file or Java startup)
+Local checks (never invoke the real dev launcher):
 
 ```sh
 bash -n scripts/dev-server.sh
 node scripts/dev-server.test.mjs
 ```
 
-Node's built-in tests copy the launcher into temporary synthetic repositories,
-use fake Docker/Maven/Java executables and a Maven-produced synthetic JAR, and invoke from outside root. They test
-quoting, literal payloads, inherited precedence, missing/unreadable/invalid config,
-build-before-run without a prebuilt JAR, build failure despite a stale JAR, Compose
-paths/credential precedence, absent/stopped/running/mismatched storage, bounded
-readiness, preflight failures, checkout exclusion, build
-environment isolation, exact invocation, exit status and SIGINT/SIGTERM during
-build/init and runtime (runtime retains the launcher PID). No dependency
-installation, real private env read, Java, DB, provider or container is involved.
-The test prints its retained temporary fixture directory. Node is needed only for
-these checks, not for running the Bash launcher. This is launcher evidence, not
-a replacement for the prior accepted Java tests or PostgreSQL runtime evidence.
+Node tests use temporary synthetic env files and fake Java/Maven/Docker, including
+one-parent/one-app-child signals and lock lifetime. Java context fixtures exercise
+real database-initialization dependency detection and integration factories with
+mocked migration/schema/service/registration ports. These are not real Docker,
+PostgreSQL migration/durability or live Telegram/provider evidence.

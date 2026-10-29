@@ -1,26 +1,49 @@
+
 spring:
   profiles:
     group:
-      ledger-init: ledger
+      ledger-init:
+        - ledger
+
   application:
     name: longnest
+
   messages:
+    # basename và encoding đã có mặc định tương ứng trong Spring Boot.
     basename: messages
     encoding: UTF-8
     fallback-to-system-locale: false
+
   main:
     web-application-type: none
     keep-alive: true
+
   threads:
     virtual:
       enabled: true
+
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+  task:
+    execution:
+      shutdown:
+        await-termination: true
+        await-termination-period: 5s
+    scheduling:
+      shutdown:
+        await-termination: true
+        await-termination-period: 10s
+
   jpa:
     hibernate:
       ddl-auto: validate
     open-in-view: false
+
   sql:
     init:
       mode: never
+
   ai:
     model:
       chat: none
@@ -31,7 +54,6 @@ longnest:
   telegram:
     enabled: false
 
-# Upstream's malformed-response warning can include prompts. Never log that class.
 logging:
   level:
     org.springframework.ai: "OFF"
