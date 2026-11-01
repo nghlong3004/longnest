@@ -1,8 +1,10 @@
 package me.nghlong3004.longnest.integration.telegram;
 
 import java.util.List;
+import java.util.Locale;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
 import me.nghlong3004.longnest.service.ChatService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
@@ -18,9 +20,12 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 @ConditionalOnProperty(prefix = "longnest.telegram", name = "enabled", havingValue = "true")
 public class TelegramMessageHandler implements LongPollingUpdateConsumer {
 
+  private static final Locale VIETNAMESE = Locale.forLanguageTag("vi");
+
   private final TelegramClient client;
   private final TelegramProperties properties;
   private final ChatService chatService;
+  private final GlobalExceptionHandler exceptionHandler;
 
   @Override
   public void consume(List<Update> updates) {
@@ -42,8 +47,7 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
       try {
         reply = chatService.reply(message.getText());
       } catch (RuntimeException exception) {
-        log.warn("Chatbot failed for update {}", update.getUpdateId());
-        reply = "Chatbot đang gặp lỗi, anh thử lại sau nhé.";
+        reply = exceptionHandler.handle(exception, VIETNAMESE);
       }
       try {
         sendReply(message.getChatId().toString(), reply);

@@ -1,26 +1,20 @@
 package me.nghlong3004.longnest.service;
 
-import lombok.RequiredArgsConstructor;
-import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.stereotype.Service;
+import me.nghlong3004.longnest.exception.ResourceException;
 
-@Service
-@RequiredArgsConstructor
-public class ChatService {
+/** Provides replies to incoming chat messages. */
+public interface ChatService {
 
-  private final ObjectProvider<ChatClient> clients;
-
-  public String reply(String text) {
-    var client = clients.getIfAvailable();
-    if (client == null) {
-      return text;
-    }
-    var answer = client.prompt().messages(new UserMessage(text)).call().content();
-    if (answer == null || answer.isBlank()) {
-      throw new IllegalStateException("Chatbot returned an empty answer");
-    }
-    return answer;
-  }
+  /**
+   * Generates a reply for the supplied user message.
+   *
+   * <p>Each call processes the message independently, without retaining conversation history. If no
+   * chat client is configured, the original text is returned unchanged.
+   *
+   * @param text the literal content of the user's message
+   * @return the model's response, or {@code text} when no chat client is configured
+   * @throws ResourceException if the chatbot is unavailable or returns a null or blank response
+   * @throws RuntimeException if an unexpected client resolution or processing error occurs
+   */
+  String reply(String text);
 }

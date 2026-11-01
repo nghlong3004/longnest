@@ -12,11 +12,18 @@ import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.stream.Collectors;
+import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
+import me.nghlong3004.longnest.exception.ResourceException;
+import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.service.ChatService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.mockito.ArgumentCaptor;
+import org.springframework.context.support.ResourceBundleMessageSource;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
@@ -29,8 +36,13 @@ class TelegramMessageHandlerTests {
 
   private final TelegramClient client = mock(TelegramClient.class);
   private final ChatService chatService = mock(ChatService.class);
+  private final ResourceBundleMessageSource messages = messageSource();
   private final TelegramMessageHandler handler =
-      new TelegramMessageHandler(client, new TelegramProperties("synthetic-token", 123L), chatService);
+      new TelegramMessageHandler(
+          client,
+          new TelegramProperties("synthetic-token", 123L),
+          chatService,
+          new GlobalExceptionHandler(messages));
 
   @BeforeEach
   void stubChatbot() {
@@ -111,10 +123,29 @@ class TelegramMessageHandlerTests {
     var sent = ArgumentCaptor.forClass(SendMessage.class);
     verify(client, times(2)).execute(sent.capture());
     assertThat(sent.getAllValues().getFirst().getText())
+        .isEqualTo(
+            messages.getMessage(
+                ErrorCode.INTERNAL_ERROR.getMessageKey(), null, Locale.forLanguageTag("vi")))
         .isNotBlank()
         .doesNotContain("sensitive provider detail")
         .isNotEqualTo("first");
     assertThat(sent.getAllValues().getLast().getText()).isEqualTo("Bot: second");
+  }
+
+  @ParameterizedTest
+  @EnumSource(ErrorCode.class)
+  void selectsTelegramErrorMessageUsingResourceExceptionCode(ErrorCode code)
+      throws TelegramApiException {
+    when(chatService.reply("failure"))
+        .thenThrow(new ResourceException(code, new IllegalStateException("private details")));
+
+    handler.consume(List.of(update(123L, 123L, "private", "failure")));
+
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(sent.capture());
+    assertThat(sent.getValue().getText())
+        .isEqualTo(messages.getMessage(code.getMessageKey(), null, Locale.forLanguageTag("vi")))
+        .doesNotContain("private details");
   }
 
   @Test
@@ -150,5 +181,13 @@ class TelegramMessageHandlerTests {
     update.setUpdateId(1);
     update.setMessage(message);
     return update;
+  }
+
+  private static ResourceBundleMessageSource messageSource() {
+    var messages = new ResourceBundleMessageSource();
+    messages.setBasename("messages");
+    messages.setDefaultEncoding("UTF-8");
+    messages.setFallbackToSystemLocale(false);
+    return messages;
   }
 }
