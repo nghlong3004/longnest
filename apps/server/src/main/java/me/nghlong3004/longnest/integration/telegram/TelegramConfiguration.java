@@ -10,6 +10,7 @@ import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.telegram.telegrambots.client.okhttp.OkHttpTelegramClient;
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
 import org.telegram.telegrambots.meta.generics.TelegramClient;
@@ -40,6 +41,14 @@ public class TelegramConfiguration {
   ScheduledExecutorService telegramPollingExecutor() {
     return Executors.newSingleThreadScheduledExecutor(
         Thread.ofVirtual().name("telegram-polling-", 0).factory());
+  }
+
+  @Bean
+  ThreadPoolTaskScheduler telegramTypingScheduler() {
+    var scheduler = new ThreadPoolTaskScheduler();
+    scheduler.setThreadFactory(Thread.ofVirtual().name("telegram-typing-", 0).factory());
+    scheduler.setRemoveOnCancelPolicy(true);
+    return scheduler;
   }
 
   @Bean

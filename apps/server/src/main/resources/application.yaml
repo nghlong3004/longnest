@@ -55,6 +55,8 @@ spring:
       read-timeout: 60s
 
 longnest:
+  ledger:
+    time-zone: ${LONGNEST_LEDGER_TIME_ZONE:Asia/Ho_Chi_Minh}
   deepseek:
     enabled: ${LONGNEST_DEEPSEEK_ENABLED:false}
     api-key: ${LONGNEST_DEEPSEEK_API_KEY:}
@@ -69,3 +71,5 @@ logging:
   level:
     org.springframework.ai: "OFF"
     org.springframework.ai.deepseek.DeepSeekChatModel: "OFF"
+    # Database exceptions may include the failing financial row in their detail.
+    org.hibernate.orm.jdbc.error: "OFF"

@@ -40,7 +40,8 @@ Draft có các thao tác hỏi lại, xác nhận và hủy; chỉ draft `PENDIN
 Cặp `channel + external_user_id` là duy nhất. Khi nhận tin, tra cặp này để lấy
 `user_id`, rồi dùng ID nội bộ đó cho giao dịch và draft. Một người có thể có nhiều
 identity; việc ghép identity mới vào người dùng có sẵn cần xác minh, không tự ghép
-dựa trên tên hiển thị hoặc `chat_id`. Chưa triển khai luồng đăng ký/ghép tài khoản.
+dựa trên tên hiển thị hoặc `chat_id`. Luồng `READY` hiện tạo user cùng identity
+cho người gửi đã được Telegram adapter cho phép; chưa có luồng ghép thêm tài khoản.
 
 `channel` có enum rõ ràng trong Java và PostgreSQL. Chưa cần bảng `channels` vì
 chưa có cấu hình hay vòng đời riêng cho từng kênh. Khi thêm kênh, bổ sung giá trị
@@ -153,7 +154,8 @@ thêm giá trị bằng migration và cập nhật enum Java, không sửa migra
   Giao dịch liên kết phải cùng chủ sở hữu và chỉ gắn với tối đa một draft.
 - Có index cho truy vấn giao dịch theo người/ngày, draft theo người/trạng thái
   và tra câu hỏi của bot. Không đặt UNIQUE trên nguồn giao dịch vì một tin có thể
-  chứa nhiều khoản; chống xử lý tin trùng thuộc phần xử lý bot sau này.
+  chứa nhiều khoản. Luồng ghi hiện khóa identity rồi kiểm tra nguồn theo owner
+  trước khi insert để chống xử lý lại tin đã ghi.
 - Khóa ngoại không xóa dây chuyền dữ liệu tài chính.
 - Giữ `ddl-auto: validate`, `sql.init.mode: never`; không dùng Hibernate tạo bảng.
 

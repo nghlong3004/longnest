@@ -58,7 +58,7 @@ public class DeepSeekConfiguration {
       @Value("classpath:prompts/transaction-chat-system.txt") Resource systemPrompt)
       throws IOException {
     var format = new BeanOutputConverter<>(ChatResponse.class, jsonMapper).getFormat();
-    log.info("DeepSeek JSON preview enabled");
+    log.info("DeepSeek structured chat enabled");
     return ChatClient.builder(model)
         .defaultTemplateRenderer(new NoOpTemplateRenderer())
         .defaultSystem(systemPrompt.getContentAsString(StandardCharsets.UTF_8) + "\n" + format)

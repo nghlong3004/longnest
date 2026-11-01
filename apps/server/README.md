@@ -15,6 +15,7 @@ LONGNEST_DEEPSEEK_ENABLED=true
 LONGNEST_DEEPSEEK_API_KEY=REPLACE_WITH_PRIVATE_API_KEY
 LONGNEST_DEEPSEEK_BASE_URL=https://api.deepseek.com
 LONGNEST_DEEPSEEK_MODEL=deepseek-flash
+LONGNEST_LEDGER_TIME_ZONE=Asia/Ho_Chi_Minh
 ```
 
 From the repository root, run:
@@ -27,21 +28,23 @@ The launcher reads `.env.dev`; Spring does not automatically load `.env` files.
 Database settings remain those required by the existing launcher.
 
 Send text to the bot in a private chat. Only the configured Telegram user's text
-is passed to DeepSeek, and its raw JSON answer is returned to the same chat for
-inspection. The JSON contains `action`, `transaction`, and `reply`; the bot
-currently displays all three, rather than sending only `reply`.
+is passed to DeepSeek. Its JSON is parsed into `ChatResponse` and validated.
+`READY` resolves the sender's internal user and saves a transaction before sending
+a confirmation built from the committed data. Other actions send only `reply`.
 Group messages, media and other senders are ignored. When DeepSeek is disabled,
 the previous echo behavior remains available.
 
-Each model request currently contains the latest message; conversation memory,
-draft merging and financial persistence are not wired yet. Classification is
-currently a model proposal displayed as JSON, without backend parsing or correction.
-Provider failures
-produce a short retry message. Long answers are split into Telegram-sized plain
+Each model request contains the latest message and its reference date in the
+configured ledger time zone. Missing transaction dates use that original message
+date. Existing identities are reused; replaying a recorded source message returns
+the stored transaction without another insert. Conversation memory and draft
+merging are not wired yet: send a complete transaction again after clarification.
+Invalid output and provider/database failures produce a short error message.
+Long answers are split into Telegram-sized plain
 text messages without breaking emoji. See [the flow](../../docs/telegram-chatbot.md).
 
-Try `Ăn trưa 45k`, `Nhận lương 15 triệu`, `Ăn trưa`, or `Xin chào` to inspect
-expense, income, clarification and ordinary-chat JSON responses.
+Try `Ăn trưa 45k` or `Nhận lương 15 triệu` to save an expense or income.
+`Ăn trưa` asks for an amount; `Xin chào` produces an ordinary reply without writes.
 
 The SDK uses long polling. Run one instance per bot token. Shutdown stops polling
 and closes the managed HTTP/executor resources. Logs omit tokens and message text.

@@ -3,18 +3,29 @@ package me.nghlong3004.longnest.integration.deepseek;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.jsonPath;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+import jakarta.validation.Validation;
+import jakarta.validation.Validator;
+import jakarta.validation.ValidatorFactory;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Map;
 import me.nghlong3004.longnest.exception.ResourceException;
+import me.nghlong3004.longnest.model.dto.ChatMessage;
+import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.service.ChatService;
+import me.nghlong3004.longnest.service.TransactionService;
 import me.nghlong3004.longnest.service.impl.ChatServiceImpl;
+import org.junit.jupiter.api.AfterAll;
+import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
@@ -27,10 +38,25 @@ import tools.jackson.databind.json.JsonMapper;
 
 class DeepSeekConfigurationTests {
 
+  private static ValidatorFactory validators;
+
+  @BeforeAll
+  static void createValidator() {
+    validators = Validation.buildDefaultValidatorFactory();
+  }
+
+  @AfterAll
+  static void closeValidator() {
+    validators.close();
+  }
+
   private final ApplicationContextRunner runner =
       new ApplicationContextRunner()
           .withUserConfiguration(DeepSeekConfiguration.class)
-          .withBean(JsonMapper.class, () -> JsonMapper.builder().build());
+          .withBean(JsonMapper.class, () -> JsonMapper.builder().build())
+          .withBean(Validator.class, () -> validators.getValidator())
+          .withBean(TransactionService.class, () -> mock(TransactionService.class))
+          .withBean(ZoneId.class, () -> ZoneId.of("Asia/Ho_Chi_Minh"));
 
   @Test
   void doesNotCreateAClientWhenDisabled() {
@@ -53,14 +79,12 @@ class DeepSeekConfigurationTests {
   }
 
   @Test
-  void requestsJsonModeWithResponseSchemaAndReturnsRawModelJson() {
+  void requestsJsonModeWithResponseSchemaAndReferenceDateAndReturnsParsedReply() {
     var builder = RestClient.builder();
     var server = MockRestServiceServer.bindTo(builder).build();
     var answer =
         """
-        {"action":"READY","transaction":{"type":"EXPENSE","amount":45000,
-        "category":"FOOD","description":"Ăn trưa","location":null,"date":null,
-        "timeOfDay":"NOON"},"reply":"Khoản chi 45.000đ cho ăn trưa — chưa lưu."}
+        {"action":"CHAT","transaction":null,"reply":"Chào anh!"}
         """;
     var response =
         JsonMapper.builder()
@@ -85,10 +109,12 @@ class DeepSeekConfigurationTests {
         .andExpect(jsonPath("$.messages[0].content").value(containsString("ASK_CLARIFICATION")))
         .andExpect(jsonPath("$.messages[0].content").value(containsString("\"transaction\"")))
         .andExpect(jsonPath("$.messages[0].content").value(containsString("\"timeOfDay\"")))
-        .andExpect(jsonPath("$.messages[1].content").value("Xin chào"))
+        .andExpect(jsonPath("$.messages[1].content").value(containsString("2026-11-02")))
+        .andExpect(jsonPath("$.messages[2].content").value("Xin chào"))
         .andRespond(withSuccess(response, MediaType.APPLICATION_JSON));
 
     runner
+        .withUserConfiguration(ChatServiceImpl.class)
         .withBean(RestClient.Builder.class, () -> builder)
         .withPropertyValues(
             "longnest.deepseek.enabled=true",
@@ -99,8 +125,10 @@ class DeepSeekConfigurationTests {
             context -> {
               assertThat(context).hasNotFailed();
               assertThat(context).hasSingleBean(DeepSeekChatModel.class);
-              assertThat(context.getBean(ChatClient.class).prompt().user("Xin chào").call().content())
-                  .isEqualTo(answer);
+              var message =
+                  new ChatMessage(Channel.TELEGRAM, "123", "123", "1",
+                      Instant.parse("2026-11-01T18:30:00Z"), "Xin chào");
+              assertThat(context.getBean(ChatService.class).reply(message)).isEqualTo("Chào anh!");
               assertThat(context.getBean(DeepSeekProperties.class).toString())
                   .doesNotContain("synthetic-key");
             });
@@ -126,7 +154,9 @@ class DeepSeekConfigurationTests {
         .run(
             context -> {
               assertThat(context).hasNotFailed();
-              assertThatThrownBy(() -> context.getBean(ChatService.class).reply("Xin chào"))
+              var message =
+                  new ChatMessage(Channel.TELEGRAM, "123", "123", "1", Instant.EPOCH, "Xin chào");
+              assertThatThrownBy(() -> context.getBean(ChatService.class).reply(message))
                   .isInstanceOfSatisfying(
                       ResourceException.class,
                       exception -> {
