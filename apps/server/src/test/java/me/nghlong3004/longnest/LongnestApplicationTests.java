@@ -2,6 +2,8 @@ package me.nghlong3004.longnest;
 
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import org.junit.jupiter.api.Test;
+
 class LongnestApplicationTests {
 
   @Test
