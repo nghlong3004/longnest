@@ -40,11 +40,14 @@ date. Existing identities are reused; replaying a recorded source message return
 the stored transaction without another insert. Clarification persists a draft:
 plain text continues the pending draft, and native Reply targets its linked question.
 Known details survive multiple rounds and restarts. Each question has a Hủy button
-that cancels the draft and removes the clicked question without a new chat message.
+that cancels the draft, removes the clicked question and sends one descriptive
+confirmation replying to the original user message. Repeated cancellation does
+not send another confirmation.
 `/cancel` also cancels the current draft. Context is scoped to the draft, not a full
 chat history.
 Invalid output and provider/database failures produce a short error message.
-Long answers are split into Telegram-sized plain
+All bot messages reply to the relevant user message, including questions, errors
+and each part of a long answer. Long answers are split into Telegram-sized plain
 text messages without breaking emoji. See [the flow](../../docs/telegram-chatbot.md).
 
 Try `Ăn trưa 45k` or `Nhận lương 15 triệu` to save an expense or income.

@@ -38,12 +38,26 @@ Ví dụ: `Ăn trưa` → bot hỏi số tiền + nút Hủy → `45` còn mơ h
 
 ## Hủy và xóa câu hỏi
 
+### Hiệu ứng tan biến
+
+Telegram gọi hiệu ứng này là [Thanos Snap](https://telegram.org/blog/calls-and-bots#thanos-snap-effect-when-deleting-messages).
+Nó do client hiển thị khi nhận sự kiện xóa; Bot API `deleteMessage` chỉ nhận chat ID
+và message ID, không có tham số ép animation. Bot dùng xóa native. Trong
+[mã Android](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java#L26695),
+client xét thêm khả năng hỗ trợ/cài đặt `FLAG_CHAT_THANOS` và tuổi tin tối thiểu
+2 giây trong chat bot. Vì vậy bot không bảo đảm hiệu ứng trên mọi ứng dụng hoặc
+cấu hình. Không dùng hiệu ứng của tin gửi (`message_effect_id`) thay cho hiệu ứng xóa.
+
 Nút inline dùng `cancel_draft:<UUID>`; backend kiểm tra owner/channel/chat của
 UUID đó, không tin callback data như bằng chứng quyền sở hữu. Hủy thành công giữ
-bản ghi `CANCELLED`, trả một thông báo nhỏ qua
+bản ghi `CANCELLED`, trả lời callback để dừng trạng thái chờ qua
 [answerCallbackQuery](https://core.telegram.org/bots/api#answercallbackquery) và gọi
 [deleteMessage](https://core.telegram.org/bots/api#deletemessage) cho đúng câu hỏi
-được bấm. Không gửi thêm tin chat. Lỗi xóa không hoàn tác trạng thái đã hủy.
+được bấm. Sau khi hủy lần đầu, gửi một tin xác nhận có nội dung và số tiền đã biết,
+ví dụ `Em hủy khoản “Ăn trưa” (45.000đ) rồi nhé.` Tin này Reply vào tin thu/chi gốc
+của người dùng. Bấm lại nút đã hủy chỉ hiện thông báo nhỏ, không gửi lặp tin chat.
+Lỗi xóa không hoàn tác trạng thái đã hủy và không chặn tin xác nhận. Tên quá dài
+được rút gọn trong thông báo để giữ một tin; dữ liệu draft trong DB giữ nguyên.
 Telegram giới hạn việc xóa tin quá 48 giờ; trạng thái DB vẫn là nguồn xác định.
 Draft đã confirmed chỉ nhận thông báo đã ghi, không xóa giao dịch bằng nút Hủy.
 Lệnh `/cancel`, `hủy` hoặc `huỷ` cũng hủy draft hiện tại mà không gọi LLM.
@@ -81,7 +95,11 @@ Khi tắt model, giữ echo; các lệnh hủy vẫn hoạt động. Khi bật m
 Sau authorization, bot làm mới [typing](https://core.telegram.org/bots/api#sendchataction)
 mỗi 4s trên scheduler riêng; hủy lịch trước khi gửi câu trả lời, kể cả khi lỗi.
 Lỗi hiển thị typing không chặn trả lời. Text gửi plain, tối đa 4096 UTF-16 units
-mỗi phần và không tách đôi emoji. Câu hỏi chỉ có một nút Hủy ở phần đầu.
+mỗi phần và không tách đôi emoji. Mọi phần của câu trả lời, câu hỏi và thông báo
+lỗi đều dùng `ReplyParameters` trỏ đúng tin người dùng đang được xử lý. Tin xác
+nhận hủy qua button dùng ID tin gốc từ draft đã kiểm tra owner/chat. Nếu người dùng
+đã xóa tin nguồn, cho phép Telegram vẫn gửi thông báo thay vì mất xác nhận.
+Câu hỏi chỉ có một nút Hủy ở phần đầu.
 
 | ErrorCode | Ý nghĩa |
 |---|---|

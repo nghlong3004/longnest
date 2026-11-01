@@ -44,7 +44,8 @@ public interface ChatService {
    *
    * @param message authorized sender and conversation
    * @param draftId button target, or null to resolve the current draft
-   * @return the committed status and a short notification; a confirmed transaction is unchanged
+   * @return the committed status, descriptive notification, original source and whether this call
+   *     changed the draft; a confirmed transaction is unchanged
    * @throws ResourceException if the target is not owned by this sender/chat or persistence fails
    */
   DraftCancellation cancelDraft(ChatMessage message, UUID draftId);

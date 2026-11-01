@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
+import me.nghlong3004.longnest.model.dto.DraftCancellation;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.service.ChatService;
@@ -23,6 +24,7 @@ import org.telegram.telegrambots.meta.api.methods.send.SendChatAction;
 import org.telegram.telegrambots.meta.api.methods.send.SendMessage;
 import org.telegram.telegrambots.meta.api.methods.updatingmessages.DeleteMessage;
 import org.telegram.telegrambots.meta.api.objects.CallbackQuery;
+import org.telegram.telegrambots.meta.api.objects.ReplyParameters;
 import org.telegram.telegrambots.meta.api.objects.Update;
 import org.telegram.telegrambots.meta.api.objects.User;
 import org.telegram.telegrambots.meta.api.objects.message.Message;
@@ -88,7 +90,7 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
       typing.cancel(false);
     }
     try {
-      var first = sendReply(chatId, reply);
+      var first = sendReply(chatId, message.getMessageId(), reply);
       if (reply.draftId() != null) {
         try {
           chatService.registerQuestion(source, reply, first.getMessageId().toString());
@@ -121,17 +123,31 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
     try {
       var source = toChatMessage(message, callback.getFrom(), "/cancel");
       var result = chatService.cancelDraft(source, draftId);
-      answerCallback(callback.getId(), result.reply());
       if (result.status() == DraftStatus.CANCELLED) {
-        try {
-          client.execute(new DeleteMessage(message.getChatId().toString(), message.getMessageId()));
-        } catch (TelegramApiException exception) {
-          log.warn(
-              "Cancelled draft question could not be deleted for callback {}", callback.getId());
-        }
+        finishCancellation(callback.getId(), message, result);
+      } else {
+        answerCallback(callback.getId(), result.reply());
       }
     } catch (RuntimeException exception) {
       answerCallback(callback.getId(), exceptionHandler.handle(exception, VIETNAMESE));
+    }
+  }
+
+  private void finishCancellation(String callbackId, Message question, DraftCancellation result) {
+    answerCallback(callbackId, result.changed() ? null : "Khoản này đã hủy rồi.");
+    var chatId = question.getChatId().toString();
+    try {
+      client.execute(new DeleteMessage(chatId, question.getMessageId()));
+    } catch (TelegramApiException exception) {
+      log.warn("Cancelled draft question could not be deleted for callback {}", callbackId);
+    }
+    if (result.changed()) {
+      try {
+        sendReply(
+            chatId, Integer.valueOf(result.originalMessageId()), ChatReply.text(result.reply()));
+      } catch (TelegramApiException exception) {
+        log.warn("Cancellation confirmation could not be sent for callback {}", callbackId);
+      }
     }
   }
 
@@ -163,7 +179,8 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
     }
   }
 
-  private Message sendReply(String chatId, ChatReply reply) throws TelegramApiException {
+  private Message sendReply(String chatId, Integer replyToMessageId, ChatReply reply)
+      throws TelegramApiException {
     var text = reply.text();
     Message first = null;
     for (int start = 0; start < text.length(); ) {
@@ -174,6 +191,11 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
         end--;
       }
       var request = new SendMessage(chatId, text.substring(start, end));
+      request.setReplyParameters(
+          ReplyParameters.builder()
+              .messageId(replyToMessageId)
+              .allowSendingWithoutReply(true)
+              .build());
       if (start == 0 && reply.draftId() != null) {
         var cancel =
             InlineKeyboardButton.builder()

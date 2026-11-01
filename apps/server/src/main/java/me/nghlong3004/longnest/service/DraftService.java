@@ -51,7 +51,8 @@ public interface DraftService {
    *
    * @param message authorized sender and chat metadata
    * @param draftId explicit button target, or null to resolve from the message/current draft
-   * @return the committed state; empty if no current draft exists for a command
+   * @return the committed state; terminal no-op results are marked replayed, and an absent current
+   *     draft returns empty for a command
    * @throws ResourceException if an explicit target is not owned by this sender/chat
    * @throws DataAccessException if persistence fails
    */

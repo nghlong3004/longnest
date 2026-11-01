@@ -1,6 +1,7 @@
 package me.nghlong3004.longnest.service.impl;
 
 import jakarta.validation.Validator;
+import java.math.BigDecimal;
 import java.text.NumberFormat;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -116,14 +117,18 @@ public class ChatServiceImpl implements ChatService {
     try {
       var context = drafts.cancel(message, draftId);
       if (context.isEmpty()) {
-        return new DraftCancellation(null, "Không có bản nháp đang chờ.");
+        return new DraftCancellation(null, "Không có bản nháp đang chờ.", false, null);
       }
       var status = context.get().status();
       var reply =
           status == DraftStatus.CANCELLED
-              ? "Đã hủy."
+              ? cancellationConfirmation(context.get().transaction())
               : "Khoản này đã ghi rồi, không thể hủy bằng nút này.";
-      return new DraftCancellation(status, reply);
+      return new DraftCancellation(
+          status,
+          reply,
+          status == DraftStatus.CANCELLED && !context.get().replayed(),
+          context.get().originalMessageId());
     } catch (DataAccessException | TransactionException exception) {
       throw new ResourceException(ErrorCode.DRAFT_UPDATE_FAILED, exception);
     }
@@ -224,11 +229,33 @@ public class ChatServiceImpl implements ChatService {
   }
 
   private String confirmation(TransactionData saved) {
-    var numbers = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
-    numbers.setMaximumFractionDigits(2);
     var type = saved.type() == TransactionType.INCOME ? "thu" : "chi";
     var description = saved.description();
     var detail = description == null || description.isBlank() ? "" : " — " + description;
-    return "Đã ghi khoản " + type + " " + numbers.format(saved.amount()) + "đ" + detail + ".";
+    return "Đã ghi khoản " + type + " " + formatAmount(saved.amount()) + "đ" + detail + ".";
+  }
+
+  private String cancellationConfirmation(TransactionData data) {
+    var description = data.description();
+    String label;
+    if (description != null && !description.isBlank()) {
+      var name = description.strip();
+      if (name.codePointCount(0, name.length()) > 120) {
+        name = name.substring(0, name.offsetByCodePoints(0, 120)) + "…";
+      }
+      label = "“" + name + "”";
+    } else if (data.type() != null) {
+      label = data.type() == TransactionType.INCOME ? "thu" : "chi";
+    } else {
+      label = "đang bổ sung";
+    }
+    var amount = data.amount() == null ? "" : " (" + formatAmount(data.amount()) + "đ)";
+    return "Em hủy khoản " + label + amount + " rồi nhé.";
+  }
+
+  private String formatAmount(BigDecimal amount) {
+    var numbers = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
+    numbers.setMaximumFractionDigits(2);
+    return numbers.format(amount);
   }
 }

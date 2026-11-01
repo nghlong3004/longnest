@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
@@ -336,7 +337,7 @@ class ChatTransactionTests {
     var next = startDraft("20", "101");
 
     assertThat(chatService.reply(draftMessage("21", "45k", "100")).text()).contains("đã hủy");
-    assertThat(chatService.reply(cancelSource).text()).contains("Đã hủy");
+    assertThat(chatService.reply(cancelSource).text()).contains("Em hủy", "Ăn trưa");
     assertThat(drafts.findById(next.draftId()).orElseThrow().getStatus())
         .isEqualTo(DraftStatus.PENDING);
     assertThat(drafts.findById(old.draftId()).orElseThrow().getStatus())
@@ -629,6 +630,48 @@ class ChatTransactionTests {
     assertThat(transactions.count()).isOne();
     assertThat(transactions.findAll().getFirst().getMessageId()).isEqualTo("10");
     verify(model, times(2)).call(any(Prompt.class));
+  }
+
+  @Test
+  void cancellationConfirmationUsesKnownDetailsAndOnlyTheFirstTransitionChangesState() {
+    var question = startDraft("10");
+    var answerSource = draftMessage("11", "45k, hôm nào quên rồi", null);
+    var context = draftService.findContext(answerSource).orElseThrow();
+    var ask =
+        new me.nghlong3004.longnest.model.dto.ChatResponse(
+            ChatAction.ASK_CLARIFICATION,
+            new TransactionData(null, new BigDecimal("45000"), null, null, null, null, null),
+            "Khoản này ngày nào anh?");
+    draftService.apply(ask, answerSource, context);
+
+    var first = chatService.cancelDraft(draftMessage("200", "/cancel", null), question.draftId());
+    var repeated =
+        chatService.cancelDraft(draftMessage("201", "/cancel", null), question.draftId());
+
+    assertThat(first.reply()).isEqualTo("Em hủy khoản “Ăn trưa” (45.000đ) rồi nhé.");
+    assertThat(first.changed()).isTrue();
+    assertThat(first.originalMessageId()).isEqualTo("10");
+    assertThat(repeated.changed()).isFalse();
+    assertThat(drafts.findById(question.draftId()).orElseThrow().getStatus())
+        .isEqualTo(DraftStatus.CANCELLED);
+    assertThat(transactions.count()).isZero();
+  }
+
+  @Test
+  void cancellationSummaryFitsOneTelegramMessageWithoutChangingStoredUnicodeDetails() {
+    var description = "🍜".repeat(5000);
+    answer(ASK.replace("Ăn trưa", description));
+    var source = draftMessage("10", "Ăn trưa", null);
+    var question = chatService.reply(source);
+
+    var cancelled =
+        chatService.cancelDraft(draftMessage("200", "/cancel", null), question.draftId());
+
+    assertThat(cancelled.reply().length()).isLessThan(4096);
+    assertThat(StandardCharsets.UTF_8.newEncoder().canEncode(cancelled.reply())).isTrue();
+    assertThat(cancelled.reply()).contains("…", "rồi nhé.");
+    assertThat(drafts.findById(question.draftId()).orElseThrow().getDescription())
+        .isEqualTo(description);
   }
 
   private ChatReply startDraft(String id) {

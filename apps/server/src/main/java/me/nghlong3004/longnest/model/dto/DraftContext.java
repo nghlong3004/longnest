@@ -18,5 +18,5 @@ public record DraftContext(
         Instant originalSentAt,
     @Schema(description = "Original source message ID", example = "42") String originalMessageId,
     @Schema(description = "Version observed before calling the model", example = "1") long version,
-    @Schema(description = "Whether this incoming message has already been processed")
+    @Schema(description = "Whether returning existing state without applying a new operation")
         boolean replayed) {}

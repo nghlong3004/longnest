@@ -6,7 +6,9 @@ commit one transaction or cancel the draft using Telegram's inline Hủy button.
 **Scope agreed in chat:** One pending draft per owner/channel/chat. Plain text
 continues that draft; native Reply can address an earlier linked question.
 Unrelated chat keeps the draft. `/cancel` or the button cancels without deleting
-the DB row. The button deletes its bot question and shows a callback toast.
+the DB row. The button deletes its bot question. The later UX update sends one
+confirmation replying to the original user message after the first cancellation;
+repeated clicks only show an already-cancelled callback toast.
 
 **Implementation:**
 - [x] Prove missing draft persistence with a failing PostgreSQL integration test.
@@ -22,7 +24,8 @@ the DB row. The button deletes its bot question and shows a callback toast.
 - [x] Check owner, channel, chat, pending status and version before mutation.
   Create the transaction and confirm its draft in one DB transaction.
 - [x] Add Hủy inline callbacks: validate owner, cancel in DB, delete only the bot
-  question for a cancelled draft, answer the callback; no extra chat message.
+  question for a cancelled draft, answer the callback and send one descriptive
+  confirmation replying to the original user message on the first transition.
 - [x] Test multiple rounds, replay/old questions, terminal drafts, ownership,
   rollback, stale context, date boundaries, callback/delete failure and typing.
 - [x] Review, run all Maven tests and diff checks, update docs, restart dev bot.
@@ -40,3 +43,9 @@ reproduced by failing tests, fixed, and rechecked; the final atomic recording pa
 had no remaining Important findings. Changed Java files were formatted with
 google-java-format 2.0.0. `git diff --check` passed. The development bot applied
 V2 and started successfully; live Telegram interaction is ready for the owner.
+
+Follow-up UX verification: 114 tests passed after adding native ReplyParameters
+to all chat responses and a named cancellation confirmation. Cancellation replay
+does not send a second confirmation; long Unicode descriptions remain intact in
+DB while the notification fits one Telegram message. Research findings about
+client-controlled Thanos Snap are recorded in docs/telegram-chatbot.md.

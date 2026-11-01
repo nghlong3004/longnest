@@ -148,12 +148,13 @@ public class DraftServiceImpl implements DraftService {
             ? linked(userId, message, message.messageId()).or(() -> target(userId, message))
             : Optional.of(owned(draftId, userId, message));
     return draft.map(current -> {
-      if (current.getStatus() == DraftStatus.PENDING) {
+      boolean changed = current.getStatus() == DraftStatus.PENDING;
+      if (changed) {
         current.cancel();
       }
       drafts.flush();
       link(current, message, message.messageId());
-      return snapshot(current, false);
+      return snapshot(current, !changed);
     });
   }
 

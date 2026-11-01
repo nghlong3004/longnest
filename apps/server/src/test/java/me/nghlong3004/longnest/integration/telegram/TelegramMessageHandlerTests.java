@@ -91,6 +91,24 @@ class TelegramMessageHandlerTests {
     assertThat(sent.getValue().getText()).isEqualTo("Bot: " + text);
     assertThat(sent.getValue().getChatId()).isEqualTo("123");
     assertThat(sent.getValue().getParseMode()).isNull();
+    assertThat(sent.getValue().getReplyParameters()).isNotNull();
+    assertThat(sent.getValue().getReplyParameters().getMessageId()).isEqualTo(1);
+  }
+
+  @Test
+  void eachReplyTargetsItsOwnIncomingMessage() throws TelegramApiException {
+    var first = update(123L, 123L, "private", "first");
+    first.getMessage().setMessageId(101);
+    var second = update(123L, 123L, "private", "second");
+    second.getMessage().setMessageId(102);
+
+    handler.consume(List.of(first, second));
+
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client, times(2)).execute(sent.capture());
+    assertThat(sent.getAllValues())
+        .extracting(message -> message.getReplyParameters().getMessageId())
+        .containsExactly(101, 102);
   }
 
   @Test
@@ -205,6 +223,7 @@ class TelegramMessageHandlerTests {
         .isNotBlank()
         .doesNotContain("sensitive provider detail")
         .isNotEqualTo("first");
+    assertThat(sent.getAllValues().getFirst().getReplyParameters().getMessageId()).isEqualTo(1);
     assertThat(sent.getAllValues().getLast().getText()).isEqualTo("Bot: second");
     verify(typingTask, times(2)).cancel(false);
   }
@@ -258,6 +277,7 @@ class TelegramMessageHandlerTests {
 
     var sent = ArgumentCaptor.forClass(SendMessage.class);
     verify(client).execute(sent.capture());
+    assertThat(sent.getValue().getReplyParameters().getMessageId()).isEqualTo(1);
     var keyboard = (InlineKeyboardMarkup) sent.getValue().getReplyMarkup();
     assertThat(keyboard.getKeyboard().getFirst().getFirst().getText()).isEqualTo("Hủy");
     assertThat(keyboard.getKeyboard().getFirst().getFirst().getCallbackData())
@@ -277,11 +297,12 @@ class TelegramMessageHandlerTests {
   }
 
   @Test
-  void cancelButtonCommitsCancellationThenShowsToastAndDeletesQuestionWithoutNewChatMessage()
-      throws TelegramApiException {
+  void cancelButtonDeletesQuestionThenSendsOneConfirmationMessage() throws TelegramApiException {
     var id = UUID.randomUUID();
     when(chatService.cancelDraft(any(ChatMessage.class), eq(id)))
-        .thenReturn(new DraftCancellation(DraftStatus.CANCELLED, "Đã hủy."));
+        .thenReturn(
+            new DraftCancellation(
+                DraftStatus.CANCELLED, "Em hủy khoản “Ăn trưa” rồi nhé.", true, "42"));
 
     handler.consume(List.of(callback(123L, 123L, "private", id)));
 
@@ -292,28 +313,54 @@ class TelegramMessageHandlerTests {
     assertThat(source.getValue().chatId()).isEqualTo("123");
     var toast = ArgumentCaptor.forClass(AnswerCallbackQuery.class);
     order.verify(client).execute(toast.capture());
-    assertThat(toast.getValue().getText()).isEqualTo("Đã hủy.");
+    assertThat(toast.getValue().getText()).isNull();
     assertThat(toast.getValue().getCallbackQueryId()).isEqualTo("callback-1");
     var deleted = ArgumentCaptor.forClass(DeleteMessage.class);
     order.verify(client).execute(deleted.capture());
     assertThat(deleted.getValue().getChatId()).isEqualTo("123");
     assertThat(deleted.getValue().getMessageId()).isEqualTo(500);
-    verify(client, never()).execute(any(SendMessage.class));
+    var confirmation = ArgumentCaptor.forClass(SendMessage.class);
+    order.verify(client).execute(confirmation.capture());
+    assertThat(confirmation.getValue().getText()).isEqualTo("Em hủy khoản “Ăn trưa” rồi nhé.");
+    assertThat(confirmation.getValue().getChatId()).isEqualTo("123");
+    assertThat(confirmation.getValue().getReplyParameters().getMessageId()).isEqualTo(42);
     verifyNoInteractions(typingScheduler);
   }
 
   @Test
-  void deleteFailureDoesNotUndoCancellationOrSendAnotherChatMessage() throws TelegramApiException {
+  void deleteFailureStillSendsTheCommittedCancellationConfirmation() throws TelegramApiException {
     var id = UUID.randomUUID();
     when(chatService.cancelDraft(any(ChatMessage.class), eq(id)))
-        .thenReturn(new DraftCancellation(DraftStatus.CANCELLED, "Đã hủy."));
+        .thenReturn(
+            new DraftCancellation(
+                DraftStatus.CANCELLED, "Em hủy khoản “Ăn trưa” rồi nhé.", true, "42"));
     when(client.execute(any(DeleteMessage.class)))
         .thenThrow(new TelegramApiException("private deletion details"));
 
     assertThatCode(() -> handler.consume(List.of(callback(123L, 123L, "private", id))))
         .doesNotThrowAnyException();
     verify(client).execute(any(AnswerCallbackQuery.class));
-    verify(client, never()).execute(any(SendMessage.class));
+    var confirmation = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(confirmation.capture());
+    assertThat(confirmation.getValue().getText()).contains("Em hủy", "Ăn trưa");
+  }
+
+  @Test
+  void repeatedCancelCallbacksDoNotSendAnotherConfirmation() throws TelegramApiException {
+    var id = UUID.randomUUID();
+    var text = "Em hủy khoản “Ăn trưa” rồi nhé.";
+    when(chatService.cancelDraft(any(ChatMessage.class), eq(id)))
+        .thenReturn(
+            new DraftCancellation(DraftStatus.CANCELLED, text, true, "42"),
+            new DraftCancellation(DraftStatus.CANCELLED, text, false, "42"));
+
+    handler.consume(
+        List.of(callback(123L, 123L, "private", id), callback(123L, 123L, "private", id)));
+
+    var confirmation = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(confirmation.capture());
+    assertThat(confirmation.getValue().getText()).isEqualTo(text);
+    verify(client, times(2)).execute(any(DeleteMessage.class));
   }
 
   @Test
@@ -321,7 +368,8 @@ class TelegramMessageHandlerTests {
       throws TelegramApiException {
     var id = UUID.randomUUID();
     when(chatService.cancelDraft(any(ChatMessage.class), eq(id)))
-        .thenReturn(new DraftCancellation(DraftStatus.CONFIRMED, "Khoản này đã ghi rồi."));
+        .thenReturn(
+            new DraftCancellation(DraftStatus.CONFIRMED, "Khoản này đã ghi rồi.", false, "42"));
     handler.consume(List.of(callback(123L, 123L, "private", id)));
     verify(client).execute(any(AnswerCallbackQuery.class));
     verify(client, never()).execute(any(DeleteMessage.class));
