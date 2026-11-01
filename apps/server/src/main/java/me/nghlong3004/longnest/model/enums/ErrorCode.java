@@ -15,6 +15,12 @@ public enum ErrorCode {
   CHATBOT_INVALID_RESPONSE("error.chatbot.invalid-response"),
   /** A transaction could not be saved successfully. */
   TRANSACTION_SAVE_FAILED("error.transaction.save-failed"),
+  /** A draft target is absent or outside the sender's conversation. */
+  DRAFT_NOT_FOUND("error.draft.not-found"),
+  /** A draft could not be updated or cancelled successfully. */
+  DRAFT_UPDATE_FAILED("error.draft.update-failed"),
+  /** Another interpretation has already changed this conversation's financial state. */
+  DRAFT_CONTEXT_CHANGED("error.draft.context-changed"),
   /** An unexpected application failure occurred. */
   INTERNAL_ERROR("error.internal");
 

@@ -21,4 +21,6 @@ public interface TransactionMapper {
   @Mapping(target = "chatId", source = "message.chatId")
   @Mapping(target = "messageId", source = "message.messageId")
   Transaction toEntity(TransactionData data, ChatMessage message, User user, LocalDate date);
+
+  TransactionData toData(Transaction transaction);
 }

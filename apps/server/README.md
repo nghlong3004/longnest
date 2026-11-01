@@ -37,14 +37,19 @@ the previous echo behavior remains available.
 Each model request contains the latest message and its reference date in the
 configured ledger time zone. Missing transaction dates use that original message
 date. Existing identities are reused; replaying a recorded source message returns
-the stored transaction without another insert. Conversation memory and draft
-merging are not wired yet: send a complete transaction again after clarification.
+the stored transaction without another insert. Clarification persists a draft:
+plain text continues the pending draft, and native Reply targets its linked question.
+Known details survive multiple rounds and restarts. Each question has a Hủy button
+that cancels the draft and removes the clicked question without a new chat message.
+`/cancel` also cancels the current draft. Context is scoped to the draft, not a full
+chat history.
 Invalid output and provider/database failures produce a short error message.
 Long answers are split into Telegram-sized plain
 text messages without breaking emoji. See [the flow](../../docs/telegram-chatbot.md).
 
 Try `Ăn trưa 45k` or `Nhận lương 15 triệu` to save an expense or income.
-`Ăn trưa` asks for an amount; `Xin chào` produces an ordinary reply without writes.
+`Ăn trưa` asks for an amount; reply `45k` to complete it or press Hủy to cancel.
+`Xin chào` produces an ordinary reply while preserving any pending draft.
 
 The SDK uses long polling. Run one instance per bot token. Shutdown stops polling
 and closes the managed HTTP/executor resources. Logs omit tokens and message text.

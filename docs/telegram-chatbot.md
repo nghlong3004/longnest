@@ -1,92 +1,105 @@
-# Telegram → chatbot → Telegram
+# Telegram → chatbot → ghi thu chi
 
-Phạm vi hiện tại: DeepSeek đề xuất thông tin thu/chi theo JSON; backend parse,
-kiểm tra và lưu `READY` vào DB trước khi xác nhận về Telegram. Chưa lưu hoặc ghép draft.
+`TelegramMessageHandler → ChatService → ChatClient/DeepSeek` để hiểu tin nhắn;
+`TransactionService` và `DraftService` lưu dữ liệu bằng Spring Data JPA. Các service
+có interface/Javadoc và implementation riêng, dùng chung `UserIdentityService`.
+MapStruct chỉ ánh xạ dữ liệu; ownership, ngày mặc định và lifecycle nằm ở service/entity.
 
-Luồng: `TelegramMessageHandler → ChatService → ChatClient → DeepSeek` và trả ngược
-qua Telegram. Giữ kiểm tra người gửi trước khi gọi model.
+## Luồng hiện tại
 
-`service/ChatService` là interface có Javadoc cho contract của từng method;
-`service/impl/ChatServiceImpl` là bean `@Service` thực hiện lời gọi chatbot.
-`TransactionService` thực hiện liên kết user và lưu giao dịch trong một transaction DB;
-`TransactionMapper` dùng MapStruct, không đặt quy tắc ngày hay quyền sở hữu trong mapper.
+- Chỉ tin nhắn riêng của Telegram user cấu hình mới được xử lý. Group, bot sender,
+  media, callback của người khác hoặc chat khác không đi tới service/model.
+- `ChatMessage` mang ID người gửi, kênh, chat, message, timestamp và reply-to do
+  adapter cung cấp. LLM không được quyết định owner hoặc ID nguồn.
+- DeepSeek JSON mode trả `ChatResponse`: `action`, `transaction`, `reply`.
+  Jackson 3 và Jakarta Validation kiểm tra JSON, enum, số tiền và dữ liệu liên quan.
+  Từ chối trường lạ/trùng, enum dạng số và nội dung dư sau JSON.
+- `READY` mới: lưu giao dịch rồi backend tạo câu từ giá trị đã commit, ví dụ
+  `Đã ghi khoản chi 45.000đ — Ăn trưa.` Không gửi lời xác nhận sẵn của LLM.
+- `ASK_CLARIFICATION`: lưu hoặc cập nhật một draft `PENDING`, rồi trả `ChatReply`
+  với text và draft ID. Telegram gắn nút **Hủy** dưới câu hỏi và đăng ký ID tin
+  câu hỏi sau khi gửi thành công.
+- Mỗi owner/channel/chat có một draft đang chờ trong luồng service. Tin thường
+  bổ sung draft đó; native Reply có thể trỏ tới bất kỳ tin đã liên kết với draft.
+  Nếu Reply không có liên kết hợp lệ, không tự tạo giao dịch mới.
+- Hỏi nhiều lượt vẫn dùng cùng draft, giữ trường đã biết khi output là null;
+  thông tin bổ sung/đính chính khác null có thể thay thế trường cũ. Đổi loại sang
+  income sẽ bỏ category chi. Chưa có thao tác xóa riêng một trường qua giá trị null.
+- Khi đủ rõ, tạo giao dịch và chuyển draft sang `CONFIRMED` cùng một transaction
+  DB. Giữ message ID gốc làm nguồn giao dịch. Lưu lỗi rollback cả việc bổ sung và
+  xác nhận; draft đang chờ vẫn có thể được trả lời lại.
+- `CHAT` chỉ trả lời, giữ draft. Khi anh muốn ghi một khoản khác trong lúc draft
+  còn chờ, prompt nhắc hủy draft hiện tại trước để tránh ghép hai khoản.
+- Câu trả lời trùng, Reply tới câu hỏi cũ và nút cũ đều tra trạng thái DB; draft
+  `CONFIRMED`/`CANCELLED` không được mở lại. Tin riêng cùng nội dung vẫn là khoản riêng.
 
-- Dùng Spring AI DeepSeek 2.0.1 có sẵn; không thêm thư viện hay tự viết HTTP API.
-- Cấu hình lấy từ các biến `LONGNEST_DEEPSEEK_ENABLED`, `LONGNEST_DEEPSEEK_API_KEY`,
-  `LONGNEST_DEEPSEEK_BASE_URL`, `LONGNEST_DEEPSEEK_MODEL` trong `.env.dev`.
-- Khi DeepSeek tắt, giữ hành vi echo trước đây. Khi bật mà thiếu cấu hình hợp lệ,
-  ứng dụng dừng khởi động thay vì âm thầm chuyển về echo.
-- Dùng model đã cấu hình, tắt thinking cho bước trò chuyện đơn giản. Không đặt
-  giới hạn token đầu ra riêng; HTTP kết nối tối đa 10 giây, đọc tối đa 60 giây và
-  không tự retry yêu cầu model.
-- Mỗi yêu cầu gửi tin nhắn mới cùng ngày gửi tin gốc và múi giờ; chưa có bộ nhớ hội thoại.
-- Sau khi kiểm tra người gửi, hiển thị `typing` bằng
-  [sendChatAction](https://core.telegram.org/bots/api#sendchataction), làm mới mỗi
-  4 giây trên scheduler riêng trong lúc xử lý. Hủy lịch trước khi gửi câu trả lời,
-  kể cả khi xử lý lỗi; lỗi hiển thị typing không chặn việc trả lời. Telegram tự
-  xóa trạng thái khi nhận tin từ bot hoặc sau tối đa 5 giây nếu không làm mới.
-- Bật DeepSeek JSON mode (`response_format.type=json_object`). Các record DTO
-  `ChatResponse`, `TransactionData` và enum `ChatAction` mô tả cấu trúc đề xuất;
-  Spring AI sinh hướng dẫn schema, không dùng schema JPA làm đầu ra.
-- Prompt nằm ở `prompts/transaction-chat-system.txt`. JSON có `action`, `transaction`,
-  `reply`; loại hành động là `READY`, `ASK_CLARIFICATION`, `CHAT`.
-- Jackson 3 parse JSON thành `ChatResponse`; từ chối JSON hỏng, trường lạ/trùng, enum lạ,
-  dữ liệu sau JSON, reply rỗng và dữ liệu không hợp lệ theo Jakarta Validation.
-  `READY` cần rõ type và amount dương trong NUMERIC(19,2). Income không có category chi.
-- `READY`: backend tìm `UserIdentity` theo channel + external user ID; chưa có thì
-  tạo user và identity cùng giao dịch trong một transaction. Metadata nguồn chỉ lấy
-  từ Telegram, không lấy ID hoặc owner do model đề xuất.
-- Sau commit thành công, backend tự tạo một câu từ dữ liệu đã lưu, ví dụ:
-  `Đã ghi khoản chi 45.000đ — Ăn trưa.` Không gửi `reply` của LLM cho `READY`.
-- `ASK_CLARIFICATION` và `CHAT`: chỉ gửi `reply`, không tạo user hoặc ghi ledger.
-  Câu trả lời bổ sung chưa được nối với câu hỏi cũ; cần gửi lại nội dung khoản đầy đủ.
-- Khi transaction date là null, lấy ngày gửi tin gốc theo `LONGNEST_LEDGER_TIME_ZONE`
-  (mặc định `Asia/Ho_Chi_Minh`), không lấy ngày chạy xử lý. Cùng ngày tham chiếu đó
-  được gửi vào system message để model hiểu ngày tương đối.
-- Chống replay trong luồng hiện tại: khóa identity trong transaction, kiểm tra
-  owner + channel + chat ID + message ID rồi trả giao dịch cũ nếu đã ghi. Các tin
-  riêng biệt cùng nội dung vẫn là các khoản riêng. Giữ schema V1 cho phép nhiều
-  giao dịch chung nguồn; chưa triển khai nhiều khoản trong một tin.
-- Tạo identity lần đầu đồng thời có thể gặp unique constraint; transaction thua
-  rollback và báo lỗi, không tạo user mồ côi. Bot hiện chỉ chạy một polling consumer.
-- Một tin nhiều khoản sẽ hỏi gửi riêng, không âm thầm cộng gộp hoặc bỏ khoản.
-- Đưa nội dung người dùng vào `UserMessage`, không coi đó là template.
-- Model trả rỗng hoặc lỗi: bot báo thử lại; lỗi một tin không chặn tin tiếp theo.
-- Câu trả lời gửi dạng văn bản, chia phần tối đa 4096 UTF-16 code units, giữ nguyên
-  nội dung và không tách đôi emoji. Không ghi nội dung hoặc API key vào log ứng dụng.
-- Token, API key không nằm trong code hoặc tài liệu; không đổi schema DB.
+Ví dụ: `Ăn trưa` → bot hỏi số tiền + nút Hủy → `45` còn mơ hồ → bot hỏi tiếp →
+`45k` → lưu 45.000đ cho ăn trưa và xác nhận. `45k` có thể là tin thường hoặc Reply.
 
-Câu thử: `Ăn trưa 45k`, `Nhận lương 15 triệu`, `Ăn trưa`, `Xin chào`. Hai câu đầu
-sẽ được ghi nếu dữ liệu hợp lệ; hai câu sau chỉ nhận câu hỏi hoặc lời chào. JSON mode
-giúp giữ cú pháp JSON; backend vẫn kiểm tra cấu trúc và dữ liệu trước khi ghi.
+## Hủy và xóa câu hỏi
 
-Kiểm tra: service với ChatModel giả; native DeepSeek client với HTTP giả; handler
-Telegram với client giả; toàn bộ Maven test; cuối cùng chạy launcher và nhắn thử
-trên bot thật. Không dùng credential thật trong test tự động.
+Nút inline dùng `cancel_draft:<UUID>`; backend kiểm tra owner/channel/chat của
+UUID đó, không tin callback data như bằng chứng quyền sở hữu. Hủy thành công giữ
+bản ghi `CANCELLED`, trả một thông báo nhỏ qua
+[answerCallbackQuery](https://core.telegram.org/bots/api#answercallbackquery) và gọi
+[deleteMessage](https://core.telegram.org/bots/api#deletemessage) cho đúng câu hỏi
+được bấm. Không gửi thêm tin chat. Lỗi xóa không hoàn tác trạng thái đã hủy.
+Telegram giới hạn việc xóa tin quá 48 giờ; trạng thái DB vẫn là nguồn xác định.
+Draft đã confirmed chỉ nhận thông báo đã ghi, không xóa giao dịch bằng nút Hủy.
+Lệnh `/cancel`, `hủy` hoặc `huỷ` cũng hủy draft hiện tại mà không gọi LLM.
 
-## Xử lý lỗi
+## Ngữ cảnh, ngày và tính nhất quán
 
-`ResourceException` giữ `ErrorCode` và nguyên nhân gốc. `ErrorCode` là enum Java
-trong `model/enums`, không phải kiểu dữ liệu lưu DB.
+- Context gồm tin gốc, các trường đang biết và câu hỏi hiện tại, không phải toàn
+  bộ lịch sử chat. Nội dung người dùng luôn ở `UserMessage`; không nâng nội dung
+  đó thành system instructions. Prompt ở `prompts/transaction-chat-system.txt`.
+- Không nói ngày: dùng ngày gửi tin gốc theo `LONGNEST_LEDGER_TIME_ZONE` (mặc định
+  `Asia/Ho_Chi_Minh`). Draft giữ timestamp gốc qua restart và các lượt hỏi.
+- Ngày tương đối trong câu trả lời mới dùng ngày gửi câu trả lời đó; ngày đã biết
+  của draft không đổi nếu người dùng chỉ bổ sung số tiền.
+- Service khóa identity/draft trong các transaction ngắn. Ghi READY không có
+  context sẽ quyết định ghi mới hay tiếp tục draft và lưu receipt trong cùng
+  transaction; thông báo đã gửi câu hỏi không làm đổi version diễn giải.
+  Version chỉ bảo vệ dữ liệu/câu hỏi/trạng thái có ý nghĩa với lượt trả lời. Không giữ transaction
+  DB trong lúc chờ model. Context cũ không được ghi đè trạng thái mới.
+- `draft_message_links` chỉ lưu ID nguồn → draft để định tuyến và chống replay,
+  gồm tin gốc, các câu hỏi đã gửi và các câu trả lời đã xử lý. Không lưu body đầy
+  đủ hoặc thay thế bằng một bảng lịch sử hội thoại.
+- Flyway V2 thêm timestamp gốc, version và bảng liên kết; không sửa V1. Draft cũ
+  dùng `created_at` làm mốc backfill khi trước đây chưa có timestamp nguồn.
+- Không đặt UNIQUE trên nguồn trong `transactions`: schema vẫn cho phép nhiều
+  khoản chung nguồn. Luồng hiện tại chỉ nhận một khoản mỗi tin; prompt hỏi gửi riêng
+  nếu có nhiều khoản. Replay và trạng thái draft được kiểm tra trước khi ghi.
 
-| Mã lỗi | Khi nào dùng | Message key |
-|---|---|---|
-| `CHATBOT_UNAVAILABLE` | Lỗi kết nối hoặc yêu cầu bị provider từ chối | `error.chatbot.unavailable` |
-| `CHATBOT_EMPTY_RESPONSE` | Model trả null hoặc chỉ có khoảng trắng | `error.chatbot.empty-response` |
-| `CHATBOT_INVALID_RESPONSE` | JSON hoặc dữ liệu không hợp lệ; chưa ghi ledger | `error.chatbot.invalid-response` |
-| `TRANSACTION_SAVE_FAILED` | Thao tác ghi DB thất bại | `error.transaction.save-failed` |
-| `INTERNAL_ERROR` | Lỗi không dự kiến | `error.internal` |
+## Cấu hình và lỗi
 
-`ChatServiceImpl` chuyển các lỗi provider, parse/validation và ghi DB đã biết thành
-`ResourceException`; lỗi lập trình vẫn giữ nguyên loại lỗi. Telegram bắt lỗi tại
-biên polling và gọi bean `GlobalExceptionHandler` để chọn thông báo qua
-`MessageSource`. Nội dung tiếng Việt nằm trong `messages_vi.properties`, bản gốc
-trong `messages.properties`. Log ghi mã lỗi, loại lỗi và vị trí khi cần; không in
-exception message hoặc nguyên nhân chứa thông tin riêng tư.
-Tắt logger `org.hibernate.orm.jdbc.error` vì PostgreSQL có thể đưa toàn bộ dòng
-tài chính bị lỗi vào chi tiết exception; handler vẫn ghi mã lỗi và loại nguyên nhân.
+Dùng Spring AI DeepSeek 2.0.1 hiện có; cấu hình từ `LONGNEST_DEEPSEEK_ENABLED`,
+`LONGNEST_DEEPSEEK_API_KEY`, `LONGNEST_DEEPSEEK_BASE_URL`, `LONGNEST_DEEPSEEK_MODEL`.
+Khi tắt model, giữ echo; các lệnh hủy vẫn hoạt động. Khi bật mà thiếu key hợp lệ,
+ứng dụng dừng khởi động. Không thêm retry model; connect timeout 10s, read timeout 60s.
 
-`@RestControllerAdvice` / `@ExceptionHandler` tự động xử lý lỗi trong HTTP
-controller, không tự bắt lỗi từ Telegram polling. Hiện ứng dụng chạy non-web,
-nên dùng handler chung do Spring quản lý và gọi trực tiếp ở Telegram. Khi thêm
-HTTP controller, advice có thể dùng lại phần chọn mã và thông báo này.
+Sau authorization, bot làm mới [typing](https://core.telegram.org/bots/api#sendchataction)
+mỗi 4s trên scheduler riêng; hủy lịch trước khi gửi câu trả lời, kể cả khi lỗi.
+Lỗi hiển thị typing không chặn trả lời. Text gửi plain, tối đa 4096 UTF-16 units
+mỗi phần và không tách đôi emoji. Câu hỏi chỉ có một nút Hủy ở phần đầu.
+
+| ErrorCode | Ý nghĩa |
+|---|---|
+| `CHATBOT_UNAVAILABLE` | Lỗi kết nối/provider |
+| `CHATBOT_EMPTY_RESPONSE` | Model không có câu trả lời |
+| `CHATBOT_INVALID_RESPONSE` | JSON hoặc dữ liệu chưa hợp lệ, không ghi |
+| `TRANSACTION_SAVE_FAILED` | Ghi dữ liệu thất bại, không báo thành công |
+| `DRAFT_NOT_FOUND` | Không có draft phù hợp với owner/chat |
+| `DRAFT_UPDATE_FAILED` | Không cập nhật/hủy được draft |
+| `DRAFT_CONTEXT_CHANGED` | Context đổi trong lúc model chạy; nạp lại trạng thái đã commit |
+| `INTERNAL_ERROR` | Lỗi ngoài dự kiến |
+
+`ResourceException` giữ mã enum và cause; `GlobalExceptionHandler` chọn thông báo
+qua `MessageSource`, chỉ log mã/loại lỗi và vị trí cần thiết. Không log nội dung
+chat, JSON model hay key. Tắt logger `org.hibernate.orm.jdbc.error` vì lỗi PostgreSQL
+có thể chứa toàn bộ dòng tài chính. Telegram polling gọi handler trực tiếp;
+`@RestControllerAdvice` chỉ tự hoạt động ở HTTP controller.
+
+Kiểm tra tự động dùng credential giả, HTTP provider giả, TelegramClient giả và
+PostgreSQL Testcontainers; không gọi model/Telegram thật. Sau đó chạy launcher để
+chủ bot thử nhiều lượt, Reply và nút Hủy trực tiếp.

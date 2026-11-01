@@ -45,7 +45,10 @@ class DatabaseMigrationTests {
         INSERT INTO user_identities (user_id, channel, external_user_id)
         VALUES (?, 'TELEGRAM', ?), (?, 'TELEGRAM', ?)
         """,
-        userId, externalId, userId, UUID.randomUUID().toString());
+        userId,
+        externalId,
+        userId,
+        UUID.randomUUID().toString());
 
     assertThat(
             jdbc.queryForList(
@@ -59,7 +62,8 @@ class DatabaseMigrationTests {
                 INSERT INTO user_identities (user_id, channel, external_user_id)
                 VALUES (?, 'TELEGRAM', ?)
                 """,
-                newUser(), externalId));
+                newUser(),
+                externalId));
     assertConstraint(
         "23503",
         () ->
@@ -68,7 +72,8 @@ class DatabaseMigrationTests {
                 INSERT INTO user_identities (user_id, channel, external_user_id)
                 VALUES (?, 'TELEGRAM', ?)
                 """,
-                UUID.randomUUID(), UUID.randomUUID().toString()));
+                UUID.randomUUID(),
+                UUID.randomUUID().toString()));
   }
 
   @Test
@@ -77,8 +82,7 @@ class DatabaseMigrationTests {
     var transactionId = newTransaction(userId);
     newTransaction(userId);
 
-    var transaction =
-        jdbc.queryForMap("SELECT * FROM transactions WHERE id = ?", transactionId);
+    var transaction = jdbc.queryForMap("SELECT * FROM transactions WHERE id = ?", transactionId);
     assertThat(transaction.get("amount")).isEqualTo(new BigDecimal("45000.00"));
     assertThat(transaction.get("category")).isNull();
     assertThat(transaction.get("time_of_day")).isNull();
@@ -99,7 +103,8 @@ class DatabaseMigrationTests {
           () ->
               jdbc.update(
                   "UPDATE transactions SET amount = CAST(? AS numeric) WHERE id = ?",
-                  amount, transactionId));
+                  amount,
+                  transactionId));
     }
     assertConstraint(
         "23502",
@@ -145,7 +150,8 @@ class DatabaseMigrationTests {
                 "UPDATE transaction_drafts SET status = 'CONFIRMED' WHERE id = ?", draftId));
     assertConstraint(
         "22P02",
-        () -> jdbc.update("UPDATE transaction_drafts SET status = 'UNKNOWN' WHERE id = ?", draftId));
+        () ->
+            jdbc.update("UPDATE transaction_drafts SET status = 'UNKNOWN' WHERE id = ?", draftId));
     assertConstraint(
         "23514",
         () -> jdbc.update("UPDATE transaction_drafts SET amount = -1 WHERE id = ?", draftId));
@@ -164,7 +170,8 @@ class DatabaseMigrationTests {
                 UPDATE transaction_drafts SET status = 'CONFIRMED', transaction_id = ?
                 WHERE id = ?
                 """,
-                transactionId, otherDraftId));
+                transactionId,
+                otherDraftId));
 
     var draftId = newDraft(ownerId);
     assertConstraint(
@@ -172,13 +179,15 @@ class DatabaseMigrationTests {
         () ->
             jdbc.update(
                 "UPDATE transaction_drafts SET transaction_id = ? WHERE id = ?",
-                transactionId, draftId));
+                transactionId,
+                draftId));
     jdbc.update(
         """
         UPDATE transaction_drafts SET status = 'CONFIRMED', transaction_id = ?
         WHERE id = ?
         """,
-        transactionId, draftId);
+        transactionId,
+        draftId);
     assertThat(
             jdbc.queryForObject(
                 "SELECT transaction_id FROM transaction_drafts WHERE id = ?", UUID.class, draftId))
@@ -193,7 +202,8 @@ class DatabaseMigrationTests {
                 UPDATE transaction_drafts SET status = 'CONFIRMED', transaction_id = ?
                 WHERE id = ?
                 """,
-                transactionId, duplicateDraftId));
+                transactionId,
+                duplicateDraftId));
   }
 
   @Test
@@ -201,6 +211,51 @@ class DatabaseMigrationTests {
     flyway.validate();
     assertThat(flyway.migrate().migrationsExecuted).isZero();
     assertThat(flyway.info().current()).isNotNull();
+  }
+
+  @Test
+  void upgradesExistingV1DraftsWithoutLosingTheirOriginalDateOrQuestionRouting() {
+    var upgrade =
+        Flyway.configure()
+            .dataSource(jdbc.getDataSource())
+            .schemas("draft_upgrade")
+            .defaultSchema("draft_upgrade")
+            .target("1")
+            .load();
+    upgrade.migrate();
+    var owner =
+        jdbc.queryForObject(
+            "INSERT INTO draft_upgrade.users DEFAULT VALUES RETURNING id", UUID.class);
+    var draftId =
+        jdbc.queryForObject(
+            """
+            INSERT INTO draft_upgrade.transaction_drafts
+              (user_id, channel, chat_id, message_id, original_text, question_text,
+               question_message_id, created_at)
+            VALUES (?, 'TELEGRAM', 'legacy-chat', 'legacy-message', 'Ăn trưa',
+              'Bao nhiêu tiền?', 'legacy-question', TIMESTAMPTZ '2026-11-01 16:59:00+00') RETURNING id
+            """,
+            UUID.class,
+            owner);
+    Flyway.configure()
+        .dataSource(jdbc.getDataSource())
+        .schemas("draft_upgrade")
+        .defaultSchema("draft_upgrade")
+        .load()
+        .migrate();
+    var row =
+        jdbc.queryForMap("SELECT * FROM draft_upgrade.transaction_drafts WHERE id = ?", draftId);
+    assertThat(row.get("original_sent_at")).isEqualTo(row.get("created_at"));
+    assertThat(row.get("version")).isEqualTo(0L);
+    assertThat(row.get("status").toString()).isEqualTo("PENDING");
+    assertThat(
+            jdbc.queryForList(
+                """
+                SELECT message_id FROM draft_upgrade.draft_message_links WHERE draft_id = ?
+                """,
+                String.class,
+                draftId))
+        .containsExactlyInAnyOrder("legacy-message", "legacy-question");
   }
 
   private static UUID newUser() {
@@ -214,7 +269,8 @@ class DatabaseMigrationTests {
         VALUES (?, 'EXPENSE', 45000, DATE '2026-11-01', 'TELEGRAM', 'chat-1', 'message-1')
         RETURNING id
         """,
-        UUID.class, userId);
+        UUID.class,
+        userId);
   }
 
   private static UUID newDraft(UUID userId) {
@@ -224,7 +280,9 @@ class DatabaseMigrationTests {
         VALUES (?, 'TELEGRAM', 'chat-1', ?, 'Ăn trưa hôm qua')
         RETURNING id
         """,
-        UUID.class, userId, UUID.randomUUID().toString());
+        UUID.class,
+        userId,
+        UUID.randomUUID().toString());
   }
 
   private static void assertConstraint(String sqlState, ThrowingCallable action) {

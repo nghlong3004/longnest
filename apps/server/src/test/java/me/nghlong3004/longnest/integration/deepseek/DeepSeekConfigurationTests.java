@@ -22,6 +22,7 @@ import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.service.ChatService;
+import me.nghlong3004.longnest.service.DraftService;
 import me.nghlong3004.longnest.service.TransactionService;
 import me.nghlong3004.longnest.service.impl.ChatServiceImpl;
 import org.junit.jupiter.api.AfterAll;
@@ -56,15 +57,15 @@ class DeepSeekConfigurationTests {
           .withBean(JsonMapper.class, () -> JsonMapper.builder().build())
           .withBean(Validator.class, () -> validators.getValidator())
           .withBean(TransactionService.class, () -> mock(TransactionService.class))
+          .withBean(DraftService.class, () -> mock(DraftService.class))
           .withBean(ZoneId.class, () -> ZoneId.of("Asia/Ho_Chi_Minh"));
 
   @Test
   void doesNotCreateAClientWhenDisabled() {
-    runner.run(
-        context -> {
-          assertThat(context).hasNotFailed();
-          assertThat(context).doesNotHaveBean(ChatClient.class);
-        });
+    runner.run(context -> {
+      assertThat(context).hasNotFailed();
+      assertThat(context).doesNotHaveBean(ChatClient.class);
+    });
   }
 
   @Test
@@ -98,9 +99,12 @@ class DeepSeekConfigurationTests {
                     "choices",
                         List.of(
                             Map.of(
-                                "index", 0,
-                                "message", Map.of("role", "assistant", "content", answer),
-                                "finish_reason", "stop"))));
+                                "index",
+                                0,
+                                "message",
+                                Map.of("role", "assistant", "content", answer),
+                                "finish_reason",
+                                "stop"))));
     server
         .expect(requestTo("https://api.deepseek.com/chat/completions"))
         .andExpect(header("Authorization", "Bearer synthetic-key"))
@@ -121,17 +125,22 @@ class DeepSeekConfigurationTests {
             "longnest.deepseek.api-key=synthetic-key",
             "longnest.deepseek.base-url=https://api.deepseek.com",
             "longnest.deepseek.model=deepseek-flash")
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              assertThat(context).hasSingleBean(DeepSeekChatModel.class);
-              var message =
-                  new ChatMessage(Channel.TELEGRAM, "123", "123", "1",
-                      Instant.parse("2026-11-01T18:30:00Z"), "Xin chào");
-              assertThat(context.getBean(ChatService.class).reply(message)).isEqualTo("Chào anh!");
-              assertThat(context.getBean(DeepSeekProperties.class).toString())
-                  .doesNotContain("synthetic-key");
-            });
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          assertThat(context).hasSingleBean(DeepSeekChatModel.class);
+          var message =
+              new ChatMessage(
+                  Channel.TELEGRAM,
+                  "123",
+                  "123",
+                  "1",
+                  Instant.parse("2026-11-01T18:30:00Z"),
+                  "Xin chào");
+          assertThat(context.getBean(ChatService.class).reply(message).text())
+              .isEqualTo("Chào anh!");
+          assertThat(context.getBean(DeepSeekProperties.class).toString())
+              .doesNotContain("synthetic-key");
+        });
     server.verify();
   }
 
@@ -151,19 +160,18 @@ class DeepSeekConfigurationTests {
             "longnest.deepseek.api-key=synthetic-key",
             "longnest.deepseek.base-url=https://api.deepseek.com",
             "longnest.deepseek.model=deepseek-flash")
-        .run(
-            context -> {
-              assertThat(context).hasNotFailed();
-              var message =
-                  new ChatMessage(Channel.TELEGRAM, "123", "123", "1", Instant.EPOCH, "Xin chào");
-              assertThatThrownBy(() -> context.getBean(ChatService.class).reply(message))
-                  .isInstanceOfSatisfying(
-                      ResourceException.class,
-                      exception -> {
-                        assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CHATBOT_UNAVAILABLE);
-                        assertThat(exception.getCause()).isNotNull();
-                      });
-            });
+        .run(context -> {
+          assertThat(context).hasNotFailed();
+          var message =
+              new ChatMessage(Channel.TELEGRAM, "123", "123", "1", Instant.EPOCH, "Xin chào");
+          assertThatThrownBy(() -> context.getBean(ChatService.class).reply(message))
+              .isInstanceOfSatisfying(
+                  ResourceException.class,
+                  exception -> {
+                    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.CHATBOT_UNAVAILABLE);
+                    assertThat(exception.getCause()).isNotNull();
+                  });
+        });
     server.verify();
   }
 }

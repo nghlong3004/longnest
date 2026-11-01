@@ -87,6 +87,8 @@ không thuộc nhóm có sẵn. Nhóm thu chưa chốt.
 | `chat_id` | String | Có | ID cuộc trò chuyện |
 | `message_id` | String | Có | ID tin nhắn gốc |
 | `original_text` | Text | Có | Nguyên văn tin nhắn gốc để giữ ngữ cảnh |
+| `original_sent_at` | Timestamp | Có | Timestamp gửi tin gốc, giữ ngày mặc định qua các lượt hỏi |
+| `version` | Bigint | Có | Phiên bản trạng thái dùng kiểm tra context cũ |
 | `question_text` | Text | Không | Câu hỏi hiện tại của bot |
 | `question_message_id` | String | Không | ID tin nhắn chứa câu hỏi hiện tại |
 | `status` | Enum | Có | `PENDING`, `CONFIRMED` hoặc `CANCELLED` |
@@ -164,7 +166,18 @@ Testcontainers → tạo V1 → thêm entity và kiểm tra JPA → chạy toàn
 Giữ `ddl-auto: validate` khi kiểm tra entity với schema Flyway. Test dùng database tạm,
 không chạy launcher hoặc đọc cấu hình bí mật của môi trường thật.
 
-## Cần chốt trước khi triển khai luồng bot
+## Liên kết tin nhắn của draft (V2)
+
+`draft_message_links`: `id`, `draft_id` (FK), `channel`, `chat_id`, `message_id`.
+Nguồn `channel + chat_id + message_id` duy nhất. Bảng nhỏ này liên kết tin gốc,
+các câu hỏi và các lượt trả lời đã xử lý với draft; không lưu đầy đủ lịch sử text.
+Nhờ đó Reply câu hỏi cũ và tin được giao lại sau restart vẫn tra đúng trạng thái,
+kể cả draft đã hủy hoặc confirmed. Xóa câu hỏi trên Telegram không xóa liên kết DB.
+
+Luồng hỏi lại nhiều lượt, nút Hủy và xác nhận cùng transaction đã được nối trong
+service; xem [luồng chatbot](telegram-chatbot.md). V2 giữ nguyên V1 đã áp dụng.
+
+## Những phần chưa triển khai
 
 - Luồng đăng ký và xác minh liên kết thêm tài khoản theo kênh.
 - Bộ nhóm thu.

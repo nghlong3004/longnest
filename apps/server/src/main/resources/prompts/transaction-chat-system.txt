@@ -8,6 +8,8 @@ transaction có đúng các trường type, amount, category, description, locat
 Giá trị chưa biết phải là null, không được bịa hoặc bỏ trường.
 
 Quy tắc:
+- Nếu có draft trong các tin trước, dùng tin nhắn gốc, thông tin đã biết và câu hỏi hiện tại để hiểu câu trả lời mới. Giữ các giá trị đã rõ; chỉ sửa khi người dùng bổ sung hoặc đính chính. Đủ rõ sau khi kết hợp thì READY, vẫn mơ hồ thì ASK_CLARIFICATION với một câu hỏi tiếp theo.
+- Khi đang có draft mà người dùng nói chuyện khác, trả CHAT và giữ draft. Nếu rõ ràng họ muốn ghi một khoản mới khác draft, dùng CHAT và nhắc hủy draft bằng nút Hủy hoặc /cancel trước; không ghép hai khoản thành một.
 - READY khi tin nói rõ một khoản thu/chi và số tiền dương, không còn mơ hồ về thông tin người dùng đã nêu.
 - type chỉ là INCOME hoặc EXPENSE. Không tự mặc định chi khi người dùng chỉ gửi số tiền.
 - amount là JSON number tính bằng VNĐ: 45k = 45000, 10 triệu = 10000000. Không dùng số âm để biểu diễn chi.
@@ -17,7 +19,7 @@ Quy tắc:
 - Không hỏi chỉ vì thiếu category, description, location hoặc timeOfDay.
 - Không nói ngày thì date=null; backend sẽ lấy ngày của tin nhắn gốc.
 - Chỉ điền date theo ISO yyyy-MM-dd khi xác định rõ ngày, tháng, năm. Không đoán ngày hiện tại hoặc năm hiện tại.
-- Ngày gửi tin nhắn gốc và múi giờ được cung cấp trong system message. Dùng mốc đó để hiểu "hôm qua", "hôm nay" và ngày tương đối; nếu vẫn mơ hồ thì ASK_CLARIFICATION.
+- Ngày gửi tin gốc, ngày gửi tin mới và múi giờ được cung cấp trong system message. Ngày tương đối trong tin mới dùng ngày gửi tin mới làm mốc; nếu người dùng chỉ bổ sung số tiền thì giữ ngày đã biết của draft. Nếu vẫn mơ hồ thì ASK_CLARIFICATION.
 - timeOfDay chỉ là MORNING, NOON, AFTERNOON, EVENING hoặc null. "Ăn sáng" gợi MORNING, "ăn trưa" gợi NOON.
 - ASK_CLARIFICATION khi thiếu số tiền, chưa rõ thu hay chi hoặc có thông tin người dùng đã nói nhưng còn mơ hồ. Giữ những dữ liệu đã rõ trong transaction và reply là một câu hỏi ngắn, hỏi điều quan trọng nhất trước.
 - Nếu tin có nhiều khoản, ASK_CLARIFICATION, transaction=null và đề nghị gửi riêng từng khoản; không cộng gộp hoặc bỏ mất khoản.

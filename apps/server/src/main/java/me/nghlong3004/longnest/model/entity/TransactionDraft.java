@@ -12,6 +12,7 @@ import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Positive;
@@ -33,6 +34,7 @@ import me.nghlong3004.longnest.model.enums.TransactionCategory;
 import me.nghlong3004.longnest.model.enums.TransactionType;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.annotations.OptimisticLock;
 import org.hibernate.annotations.SourceType;
 import org.hibernate.annotations.UpdateTimestamp;
 import org.hibernate.type.SqlTypes;
@@ -98,9 +100,17 @@ public class TransactionDraft {
   @Column(name = "original_text", nullable = false, columnDefinition = "text")
   private String originalText;
 
+  @Column(name = "original_sent_at", nullable = false, updatable = false)
+  private Instant originalSentAt;
+
+  @Version
+  @Column(name = "version", nullable = false)
+  private long version;
+
   @Column(name = "question_text", columnDefinition = "text")
   private String questionText;
 
+  @OptimisticLock(excluded = true)
   @Column(name = "question_message_id", columnDefinition = "text")
   private String questionMessageId;
 
@@ -118,6 +128,7 @@ public class TransactionDraft {
   private Instant createdAt;
 
   @UpdateTimestamp(source = SourceType.DB)
+  @OptimisticLock(excluded = true)
   @Column(name = "updated_at", nullable = false)
   private Instant updatedAt;
 
@@ -134,7 +145,8 @@ public class TransactionDraft {
       Channel channel,
       String chatId,
       String messageId,
-      String originalText) {
+      String originalText,
+      Instant originalSentAt) {
     this.user = Objects.requireNonNull(user, "User is required");
     this.channel = Objects.requireNonNull(channel, "Channel is required");
     if (chatId == null || chatId.isBlank() || messageId == null || messageId.isBlank()) {
@@ -143,12 +155,8 @@ public class TransactionDraft {
     if (originalText == null || originalText.isBlank()) {
       throw new IllegalArgumentException("Original message text is required");
     }
-    if (amount != null) {
-      this.amount = amount.setScale(2, RoundingMode.UNNECESSARY);
-      if (this.amount.signum() <= 0 || this.amount.precision() > 19) {
-        throw new IllegalArgumentException("Amount must be positive and fit NUMERIC(19,2)");
-      }
-    }
+    this.amount = normalizeAmount(amount);
+    this.originalSentAt = Objects.requireNonNull(originalSentAt, "Original timestamp is required");
     this.type = type;
     this.category = category;
     this.description = description;
@@ -158,6 +166,53 @@ public class TransactionDraft {
     this.chatId = chatId;
     this.messageId = messageId;
     this.originalText = originalText;
+  }
+
+  /** Applies supplied details while preserving known values and the draft's lifecycle. */
+  public void revise(
+      TransactionType type,
+      BigDecimal amount,
+      TransactionCategory category,
+      String description,
+      String location,
+      LocalDate date,
+      TimeOfDay timeOfDay) {
+    requirePending();
+    var normalizedAmount = normalizeAmount(amount);
+    if (type != null) {
+      this.type = type;
+    }
+    if (normalizedAmount != null) {
+      this.amount = normalizedAmount;
+    }
+    if (category != null) {
+      this.category = category;
+    }
+    if (this.type == TransactionType.INCOME) {
+      this.category = null;
+    }
+    if (description != null) {
+      this.description = description;
+    }
+    if (location != null) {
+      this.location = location;
+    }
+    if (date != null) {
+      this.date = date;
+    }
+    if (timeOfDay != null) {
+      this.timeOfDay = timeOfDay;
+    }
+  }
+
+  /** Records a new question before the transport has assigned its message ID. */
+  public void askForClarification(String questionText) {
+    requirePending();
+    if (questionText == null || questionText.isBlank()) {
+      throw new IllegalArgumentException("Question text is required");
+    }
+    this.questionText = questionText;
+    this.questionMessageId = null;
   }
 
   public void askForClarification(String questionText, String questionMessageId) {
@@ -178,7 +233,8 @@ public class TransactionDraft {
     if (transaction.getId() == null
         || user.getId() == null
         || !user.getId().equals(transaction.getUser().getId())) {
-      throw new IllegalArgumentException("Transaction must be persisted and belong to the same user");
+      throw new IllegalArgumentException(
+          "Transaction must be persisted and belong to the same user");
     }
     this.transaction = transaction;
     this.status = DraftStatus.CONFIRMED;
@@ -193,5 +249,16 @@ public class TransactionDraft {
     if (status != DraftStatus.PENDING) {
       throw new IllegalStateException("Only pending drafts can be changed");
     }
+  }
+
+  private static BigDecimal normalizeAmount(BigDecimal amount) {
+    if (amount == null) {
+      return null;
+    }
+    var normalized = amount.setScale(2, RoundingMode.UNNECESSARY);
+    if (normalized.signum() <= 0 || normalized.precision() > 19) {
+      throw new IllegalArgumentException("Amount must be positive and fit NUMERIC(19,2)");
+    }
+    return normalized;
   }
 }

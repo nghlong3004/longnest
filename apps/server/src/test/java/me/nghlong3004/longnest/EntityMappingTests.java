@@ -41,7 +41,8 @@ class EntityMappingTests {
   void discoversEntitiesAndValidatesTheirMappingsAgainstFlywaySchema() {
     assertThat(entityManager.getMetamodel().getEntities())
         .extracting(EntityType::getName)
-        .containsExactlyInAnyOrder("User", "UserIdentity", "Transaction", "TransactionDraft");
+        .containsExactlyInAnyOrder(
+            "User", "UserIdentity", "Transaction", "TransactionDraft", "DraftMessageLink");
   }
 
   @Test
@@ -99,7 +100,8 @@ class EntityMappingTests {
     entityManager.flush();
     var createdAt = draft.getCreatedAt();
     jdbc.update(
-        "UPDATE transaction_drafts SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00' WHERE id = ?",
+        "UPDATE transaction_drafts SET updated_at = TIMESTAMPTZ '2000-01-01 00:00:00+00' WHERE id ="
+            + " ?",
         draft.getId());
     entityManager.clear();
 
@@ -149,24 +151,22 @@ class EntityMappingTests {
   @Test
   void rejectsInvalidMoneyAtConstructionInsteadOfRoundingItSilently() {
     var user = User.builder().build();
-    assertThatThrownBy(
-            () ->
-                Transaction.builder()
-                    .user(user)
-                    .type(TransactionType.EXPENSE)
-                    .amount(BigDecimal.ZERO)
-                    .build())
+    assertThatThrownBy(() ->
+            Transaction.builder()
+                .user(user)
+                .type(TransactionType.EXPENSE)
+                .amount(BigDecimal.ZERO)
+                .build())
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(
-            () ->
-                TransactionDraft.builder()
-                    .user(user)
-                    .channel(Channel.TELEGRAM)
-                    .chatId("chat-1")
-                    .messageId("message-1")
-                    .originalText("Ăn trưa")
-                    .amount(new BigDecimal("0.001"))
-                    .build())
+    assertThatThrownBy(() ->
+            TransactionDraft.builder()
+                .user(user)
+                .channel(Channel.TELEGRAM)
+                .chatId("chat-1")
+                .messageId("message-1")
+                .originalText("Ăn trưa")
+                .amount(new BigDecimal("0.001"))
+                .build())
         .isInstanceOf(ArithmeticException.class);
   }
 
@@ -193,6 +193,7 @@ class EntityMappingTests {
         .chatId("chat-1")
         .messageId("message-1")
         .originalText("Ăn trưa hôm qua")
+        .originalSentAt(Instant.parse("2026-11-01T05:00:00Z"))
         .build();
   }
 }
