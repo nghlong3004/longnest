@@ -16,7 +16,7 @@ public class TelegramBotLifecycle implements SmartLifecycle {
 
   private final TelegramBotsLongPollingApplication polling;
   private final TelegramProperties properties;
-  private final TelegramEchoHandler handler;
+  private final TelegramMessageHandler handler;
   private volatile boolean running;
 
   @Override
@@ -27,7 +27,7 @@ public class TelegramBotLifecycle implements SmartLifecycle {
     try {
       polling.registerBot(properties.token(), handler);
       running = true;
-      log.info("Telegram echo bot started");
+      log.info("Telegram bot started");
     } catch (TelegramApiException exception) {
       // SDK exceptions may include request URLs containing the bot token.
       throw new IllegalStateException("Unable to register Telegram bot; check token and connectivity");

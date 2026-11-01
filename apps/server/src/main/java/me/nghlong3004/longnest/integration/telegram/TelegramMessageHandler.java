@@ -3,6 +3,7 @@ package me.nghlong3004.longnest.integration.telegram;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import me.nghlong3004.longnest.service.ChatService;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.telegram.telegrambots.longpolling.interfaces.LongPollingUpdateConsumer;
@@ -15,10 +16,11 @@ import org.telegram.telegrambots.meta.generics.TelegramClient;
 @Component
 @RequiredArgsConstructor
 @ConditionalOnProperty(prefix = "longnest.telegram", name = "enabled", havingValue = "true")
-public class TelegramEchoHandler implements LongPollingUpdateConsumer {
+public class TelegramMessageHandler implements LongPollingUpdateConsumer {
 
   private final TelegramClient client;
   private final TelegramProperties properties;
+  private final ChatService chatService;
 
   @Override
   public void consume(List<Update> updates) {
@@ -36,12 +38,32 @@ public class TelegramEchoHandler implements LongPollingUpdateConsumer {
           || !properties.user().equals(message.getChatId())) {
         continue;
       }
+      String reply;
       try {
-        client.execute(new SendMessage(message.getChatId().toString(), message.getText()));
-        log.info("Telegram echo sent for update {}", update.getUpdateId());
-      } catch (TelegramApiException exception) {
-        log.warn("Telegram echo could not be sent for update {}", update.getUpdateId());
+        reply = chatService.reply(message.getText());
+      } catch (RuntimeException exception) {
+        log.warn("Chatbot failed for update {}", update.getUpdateId());
+        reply = "Chatbot đang gặp lỗi, anh thử lại sau nhé.";
       }
+      try {
+        sendReply(message.getChatId().toString(), reply);
+        log.info("Telegram reply sent for update {}", update.getUpdateId());
+      } catch (TelegramApiException exception) {
+        log.warn("Telegram reply could not be sent for update {}", update.getUpdateId());
+      }
+    }
+  }
+
+  private void sendReply(String chatId, String text) throws TelegramApiException {
+    for (int start = 0; start < text.length(); ) {
+      int end = Math.min(start + 4096, text.length());
+      if (end < text.length()
+          && Character.isHighSurrogate(text.charAt(end - 1))
+          && Character.isLowSurrogate(text.charAt(end))) {
+        end--;
+      }
+      client.execute(new SendMessage(chatId, text.substring(start, end)));
+      start = end;
     }
   }
 }

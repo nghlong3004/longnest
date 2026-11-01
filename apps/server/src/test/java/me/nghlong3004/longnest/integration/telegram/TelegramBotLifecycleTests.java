@@ -16,7 +16,7 @@ class TelegramBotLifecycleTests {
   private final TelegramBotsLongPollingApplication polling =
       mock(TelegramBotsLongPollingApplication.class);
   private final TelegramProperties properties = new TelegramProperties("synthetic-token", 123L);
-  private final TelegramEchoHandler handler = mock(TelegramEchoHandler.class);
+  private final TelegramMessageHandler handler = mock(TelegramMessageHandler.class);
   private final TelegramBotLifecycle lifecycle = new TelegramBotLifecycle(polling, properties, handler);
 
   @Test

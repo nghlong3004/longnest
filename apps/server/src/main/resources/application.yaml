@@ -46,11 +46,20 @@ spring:
 
   ai:
     model:
+      # The conditional DeepSeek configuration owns the model bean.
       chat: none
+
+  http:
+    clients:
+      connect-timeout: 10s
+      read-timeout: 60s
 
 longnest:
   deepseek:
-    enabled: false
+    enabled: ${LONGNEST_DEEPSEEK_ENABLED:false}
+    api-key: ${LONGNEST_DEEPSEEK_API_KEY:}
+    base-url: ${LONGNEST_DEEPSEEK_BASE_URL:https://api.deepseek.com}
+    model: ${LONGNEST_DEEPSEEK_MODEL:deepseek-flash}
   telegram:
     enabled: ${LONGNEST_TELEGRAM_ENABLED:false}
     token: ${LONGNEST_TELEGRAM_TOKEN:}
