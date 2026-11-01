@@ -1,7 +1,7 @@
 # Telegram → chatbot → Telegram
 
-Phạm vi: nối nội dung văn bản từ Telegram tới DeepSeek và trả câu trả lời về đúng
-cuộc trò chuyện riêng của chủ bot. Chưa phân loại, lưu giao dịch hay lưu draft.
+Phạm vi hiện tại: cho DeepSeek đề xuất thông tin thu/chi theo JSON và gửi nguyên
+JSON về cuộc trò chuyện riêng của chủ bot để kiểm tra. Chưa lưu giao dịch hay draft.
 
 Luồng: `TelegramMessageHandler → ChatService → ChatClient → DeepSeek` và trả ngược
 qua Telegram. Giữ kiểm tra người gửi trước khi gọi model.
@@ -18,11 +18,31 @@ qua Telegram. Giữ kiểm tra người gửi trước khi gọi model.
   giới hạn token đầu ra riêng; HTTP kết nối tối đa 10 giây, đọc tối đa 60 giây và
   không tự retry yêu cầu model.
 - Mỗi yêu cầu hiện chỉ gửi tin nhắn mới; chưa thêm bộ nhớ hội thoại.
+- Bật DeepSeek JSON mode (`response_format.type=json_object`). Các record DTO
+  `ChatResponse`, `TransactionData` và enum `ChatAction` mô tả cấu trúc đề xuất;
+  Spring AI sinh hướng dẫn schema, không dùng schema JPA làm đầu ra.
+- Prompt nằm ở `prompts/transaction-chat-system.txt`. JSON có `action`, `transaction`,
+  `reply`; loại hành động là `READY`, `ASK_CLARIFICATION`, `CHAT`.
+- Telegram hiển thị toàn bộ JSON gốc của model, chưa chỉ lấy trường `reply`.
+  Code không parse, sửa hoặc tự bổ sung kết quả trong bước kiểm tra này.
+- Với `READY`, `reply` nói rõ trạng thái chưa lưu, ví dụ:
+  `Khoản chi 45.000đ cho ăn trưa — chưa lưu.` Chỉ dùng lời xác nhận đã ghi sau khi
+  triển khai và lưu DB thành công.
+- Luồng chính sau khi nối DB: đủ thông tin thì kiểm tra, lưu thành công rồi gửi
+  một tin xác nhận; không gửi thêm tin "Em hiểu" trước đó. Thiếu thông tin thì hỏi
+  lại trước khi lưu. Luồng lưu này chưa được triển khai trong bản kiểm tra JSON.
+- Không có ngày cụ thể thì `date=null`. Ngày tương đối chưa có mốc tham chiếu sẽ
+  hỏi lại; chưa truyền ngày gửi tin vào prompt ở bước này.
+- Một tin nhiều khoản sẽ hỏi gửi riêng, không âm thầm cộng gộp hoặc bỏ khoản.
 - Đưa nội dung người dùng vào `UserMessage`, không coi đó là template.
 - Model trả rỗng hoặc lỗi: bot báo thử lại; lỗi một tin không chặn tin tiếp theo.
 - Câu trả lời gửi dạng văn bản, chia phần tối đa 4096 UTF-16 code units, giữ nguyên
   nội dung và không tách đôi emoji. Không ghi nội dung hoặc API key vào log ứng dụng.
 - Token, API key không nằm trong code hoặc tài liệu; không đổi schema DB.
+
+Câu thử: `Ăn trưa 45k`, `Nhận lương 15 triệu`, `Ăn trưa`, `Xin chào`. Kết quả lần
+lượt nên là `READY/EXPENSE`, `READY/INCOME`, `ASK_CLARIFICATION`, `CHAT`. JSON mode
+giúp giữ cú pháp JSON; ý nghĩa và sự đầy đủ của dữ liệu vẫn cần kiểm tra.
 
 Kiểm tra: service với ChatModel giả; native DeepSeek client với HTTP giả; handler
 Telegram với client giả; toàn bộ Maven test; cuối cùng chạy launcher và nhắn thử

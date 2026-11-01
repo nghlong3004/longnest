@@ -27,14 +27,21 @@ The launcher reads `.env.dev`; Spring does not automatically load `.env` files.
 Database settings remain those required by the existing launcher.
 
 Send text to the bot in a private chat. Only the configured Telegram user's text
-is passed to DeepSeek, and the model's answer is returned to the same chat.
+is passed to DeepSeek, and its raw JSON answer is returned to the same chat for
+inspection. The JSON contains `action`, `transaction`, and `reply`; the bot
+currently displays all three, rather than sending only `reply`.
 Group messages, media and other senders are ignored. When DeepSeek is disabled,
 the previous echo behavior remains available.
 
 Each model request currently contains the latest message; conversation memory,
-classification and financial persistence are not wired yet. Provider failures
+draft merging and financial persistence are not wired yet. Classification is
+currently a model proposal displayed as JSON, without backend parsing or correction.
+Provider failures
 produce a short retry message. Long answers are split into Telegram-sized plain
 text messages without breaking emoji. See [the flow](../../docs/telegram-chatbot.md).
+
+Try `Ăn trưa 45k`, `Nhận lương 15 triệu`, `Ăn trưa`, or `Xin chào` to inspect
+expense, income, clarification and ordinary-chat JSON responses.
 
 The SDK uses long polling. Run one instance per bot token. Shutdown stops polling
 and closes the managed HTTP/executor resources. Logs omit tokens and message text.

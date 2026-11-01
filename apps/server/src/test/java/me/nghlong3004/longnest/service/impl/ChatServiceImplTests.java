@@ -27,16 +27,24 @@ import org.springframework.web.client.ResourceAccessException;
 class ChatServiceImplTests {
 
   @Test
-  void sendsLiteralUserTextToModelAndReturnsItsAnswer() {
+  void sendsLiteralUserTextToModelAndPreservesRawJsonAnswer() {
     var model = mock(ChatModel.class);
     when(model.getOptions()).thenReturn(ChatOptions.builder().build());
+    var answer =
+        """
+        {
+          "action": "CHAT",
+          "transaction": null,
+          "reply": "Chào anh!"
+        }
+        """;
     when(model.call(any(Prompt.class)))
-        .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage("Chào anh!")))));
+        .thenReturn(new ChatResponse(List.of(new Generation(new AssistantMessage(answer)))));
     var clients = new StaticListableBeanFactory(Map.of("chatClient", ChatClient.create(model)));
     ChatService service = new ChatServiceImpl(clients.getBeanProvider(ChatClient.class));
     var text = "Xin chào {name}, đây là JSON: {\"amount\":45000}";
 
-    assertThat(service.reply(text)).isEqualTo("Chào anh!");
+    assertThat(service.reply(text)).isEqualTo(answer);
 
     var prompt = ArgumentCaptor.forClass(Prompt.class);
     verify(model).call(prompt.capture());

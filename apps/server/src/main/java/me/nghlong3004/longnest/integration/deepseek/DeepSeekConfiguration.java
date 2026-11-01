@@ -1,17 +1,26 @@
 package me.nghlong3004.longnest.integration.deepseek;
 
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import lombok.extern.slf4j.Slf4j;
+import me.nghlong3004.longnest.model.dto.ChatResponse;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.converter.BeanOutputConverter;
 import org.springframework.ai.deepseek.DeepSeekChatModel;
 import org.springframework.ai.deepseek.DeepSeekChatOptions;
 import org.springframework.ai.deepseek.api.DeepSeekApi;
+import org.springframework.ai.deepseek.api.ResponseFormat;
+import org.springframework.ai.template.NoOpTemplateRenderer;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.core.io.Resource;
 import org.springframework.core.retry.RetryPolicy;
 import org.springframework.core.retry.RetryTemplate;
 import org.springframework.web.client.RestClient;
+import tools.jackson.databind.json.JsonMapper;
 
 @Slf4j
 @Configuration(proxyBeanMethods = false)
@@ -32,21 +41,27 @@ public class DeepSeekConfiguration {
   DeepSeekChatModel deepSeekChatModel(DeepSeekApi api, DeepSeekProperties properties) {
     return DeepSeekChatModel.builder()
         .deepSeekApi(api)
-        .options(DeepSeekChatOptions.builder().model(properties.model()).disableThinking().build())
+        .options(
+            DeepSeekChatOptions.builder()
+                .model(properties.model())
+                .disableThinking()
+                .responseFormat(ResponseFormat.builder().type(ResponseFormat.Type.JSON_OBJECT).build())
+                .build())
         .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0)))
         .build();
   }
 
   @Bean
-  ChatClient deepSeekChatClient(DeepSeekChatModel model) {
-    log.info("DeepSeek chatbot enabled");
+  ChatClient deepSeekChatClient(
+      DeepSeekChatModel model,
+      JsonMapper jsonMapper,
+      @Value("classpath:prompts/transaction-chat-system.txt") Resource systemPrompt)
+      throws IOException {
+    var format = new BeanOutputConverter<>(ChatResponse.class, jsonMapper).getFormat();
+    log.info("DeepSeek JSON preview enabled");
     return ChatClient.builder(model)
-        .defaultSystem(
-            """
-            Bạn là trợ lý Longnest. Hãy trò chuyện bằng tiếng Việt, ngắn gọn và tự nhiên.
-            Hiện tại bạn chỉ trò chuyện, chưa có khả năng lưu hay sửa dữ liệu.
-            Không khẳng định đã ghi nhận giao dịch hoặc cập nhật dữ liệu của người dùng.
-            """)
+        .defaultTemplateRenderer(new NoOpTemplateRenderer())
+        .defaultSystem(systemPrompt.getContentAsString(StandardCharsets.UTF_8) + "\n" + format)
         .build();
   }
 }
