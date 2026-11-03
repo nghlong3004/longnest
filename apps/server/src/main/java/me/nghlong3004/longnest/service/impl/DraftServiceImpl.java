@@ -56,6 +56,9 @@ public class DraftServiceImpl implements DraftService {
       throw new IllegalArgumentException("Chat output cannot update a financial draft");
     }
     var user = identities.resolve(message).getUser();
+    if (transactions.isMutationInput(message)) {
+      throw new ResourceException(ErrorCode.TRANSACTION_INPUT_PROCESSED);
+    }
     var processed = linked(user.getId(), message, message.messageId());
     if (processed.isPresent()) {
       return snapshot(processed.get(), true);

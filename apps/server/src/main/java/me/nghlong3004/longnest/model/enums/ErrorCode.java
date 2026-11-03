@@ -21,6 +21,10 @@ public enum ErrorCode {
   DRAFT_UPDATE_FAILED("error.draft.update-failed"),
   /** Another interpretation has already changed this conversation's financial state. */
   DRAFT_CONTEXT_CHANGED("error.draft.context-changed"),
+  QUERY_INVALID_PARAMETERS("error.query.invalid-parameters"),
+  QUERY_FAILED("error.query.failed"),
+  TRANSACTION_DELETED("error.transaction.deleted"),
+  TRANSACTION_INPUT_PROCESSED("error.transaction.input-processed"),
   /** An unexpected application failure occurred. */
   INTERNAL_ERROR("error.internal");
 

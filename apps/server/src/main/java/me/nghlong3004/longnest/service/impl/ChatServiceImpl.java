@@ -1,59 +1,82 @@
 package me.nghlong3004.longnest.service.impl;
 
 import jakarta.validation.Validator;
-import java.math.BigDecimal;
-import java.text.NumberFormat;
-import java.time.ZoneId;
-import java.util.ArrayList;
 import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import me.nghlong3004.longnest.exception.ResourceException;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
-import me.nghlong3004.longnest.model.dto.ChatResponse;
 import me.nghlong3004.longnest.model.dto.DraftCancellation;
 import me.nghlong3004.longnest.model.dto.DraftContext;
-import me.nghlong3004.longnest.model.dto.TransactionData;
+import me.nghlong3004.longnest.model.dto.TransactionCursor;
+import me.nghlong3004.longnest.model.dto.TransactionPageRequest;
+import me.nghlong3004.longnest.model.dto.TransactionQuery;
 import me.nghlong3004.longnest.model.enums.ChatAction;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.model.enums.TransactionType;
 import me.nghlong3004.longnest.service.ChatService;
+import me.nghlong3004.longnest.service.ConversationHistory;
 import me.nghlong3004.longnest.service.DraftService;
+import me.nghlong3004.longnest.service.TransactionMessageFormatter;
+import me.nghlong3004.longnest.service.TransactionModelInterpreter;
+import me.nghlong3004.longnest.service.TransactionQueryService;
 import me.nghlong3004.longnest.service.TransactionService;
+import me.nghlong3004.longnest.service.VietnameseQueryRecovery;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.retry.NonTransientAiException;
-import org.springframework.ai.retry.TransientAiException;
 import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.TransactionException;
-import org.springframework.web.client.RestClientException;
-import tools.jackson.core.JacksonException;
-import tools.jackson.core.StreamReadFeature;
-import tools.jackson.databind.DeserializationFeature;
-import tools.jackson.databind.cfg.EnumFeature;
-import tools.jackson.databind.json.JsonMapper;
 
 @Service
 @RequiredArgsConstructor
 public class ChatServiceImpl implements ChatService {
 
+  private static final String DELETED_REPLY =
+      "Em đã xóa vĩnh viễn khoản này khỏi sổ. Tin cũ không tạo lại khoản này nhé.";
+
   private final ObjectProvider<ChatClient> clients;
-  private final JsonMapper jsonMapper;
   private final Validator validator;
   private final TransactionService transactions;
-  private final ZoneId ledgerTimeZone;
   private final DraftService drafts;
+  private final TransactionQueryService queries;
+  private final TransactionMessageFormatter formatter;
+  private final ConversationHistory history;
+  private final TransactionModelInterpreter interpreter;
 
   @Override
   public ChatReply reply(ChatMessage message) {
     validateMessage(message);
+    synchronized (history.lock(message)) {
+      var reply = replyInOrder(message);
+      rememberReply(message, reply);
+      return reply;
+    }
+  }
+
+  @Override
+  public void rememberReply(ChatMessage message, ChatReply reply) {
+    validateMessage(message);
+    synchronized (history.lock(message)) {
+      var intent = VietnameseQueryRecovery.interpret(message.text(), history.queryType(message));
+      var queryType =
+          reply.transactions() == null ? intent.type() : reply.transactions().filter().type();
+      var text = reply.text();
+      if (reply.transactions() != null) {
+        for (var item : reply.transactions().items()) text += "\n" + formatter.entry(item);
+      }
+      history.remember(
+          message, text, intent.viewing() || reply.transactions() != null ? queryType : null);
+    }
+  }
+
+  private ChatReply replyInOrder(ChatMessage message) {
+    if (transactions.isMutationInput(message)) {
+      return ChatReply.text(
+          "Em đã xử lý tin này trong thao tác sửa/xóa rồi. Xem lại sổ hoặc gửi tin mới nhé.");
+    }
     if (isCancelCommand(message.text())) {
       return ChatReply.text(cancelDraft(message, null).reply());
     }
@@ -64,28 +87,73 @@ public class ChatServiceImpl implements ChatService {
     try {
       var recorded = transactions.findRecorded(message);
       if (recorded.isPresent()) {
-        return ChatReply.text(confirmation(recorded.get()));
+        return ChatReply.text(formatter.confirmation(recorded.get(), message.displayName()));
       }
       var context = drafts.findContext(message).orElse(null);
-      if (context != null && (context.replayed() || context.status() != DraftStatus.PENDING)) {
-        return fromDraft(context);
+      if (context != null && context.replayed()) {
+        return fromDraft(context, message.displayName());
       }
-      if (context == null && message.replyToMessageId() != null) {
+      if (isPureGreeting(message.text())) {
+        return ChatReply.text(formatter.greeting(message.displayName()));
+      }
+      var response = interpreter.interpret(client, message, context);
+      var intent = VietnameseQueryRecovery.interpret(message.text(), history.queryType(message));
+      if (intent.query() != null) {
+        return view(message, intent.query(), null);
+      }
+      if (response.action() == ChatAction.QUERY) {
+        return view(message, response.query(), null);
+      }
+      if (intent.viewing()) {
         return ChatReply.text(
-            "Không tìm thấy bản nháp cho câu hỏi này. Anh gửi lại khoản đầy đủ nhé.");
+            intent.type() == null
+                ? "Em tra khoản thu hay khoản chi nhé?"
+                : "Cho em xin khoảng thời gian muốn xem khoản "
+                    + (intent.type() == TransactionType.EXPENSE ? "chi" : "thu")
+                    + " nhé.");
       }
-      var response = interpret(client, message, context);
       if (response.action() == ChatAction.CHAT) {
         return ChatReply.text(response.reply());
       }
+      if (VietnameseQueryRecovery.acknowledgment(message.text())) {
+        return ChatReply.text("Không có gì, cứ nhắn em khi cần nhé.");
+      }
+      if (context != null && context.status() != DraftStatus.PENDING) {
+        return fromDraft(context, message.displayName());
+      }
+      if (context == null && message.replyToMessageId() != null) {
+        return ChatReply.text(
+            "Em không tìm thấy bản nháp cho câu hỏi này. Gửi lại khoản đầy đủ giúp em nhé.");
+      }
+      if (response.action() == ChatAction.READY
+          && (((context == null || context.status() != DraftStatus.PENDING)
+                  && (!VietnameseQueryRecovery.canCreate(message.text())
+                      || (VietnameseQueryRecovery.hasDateCue(message.text())
+                          && response.transaction().date() == null)))
+              || (context != null
+                  && context.status() == DraftStatus.PENDING
+                  && context.transaction().amount() == null
+                  && !VietnameseQueryRecovery.canAnswerAmount(message.text())))) {
+        return ChatReply.text(
+            context != null && context.status() == DraftStatus.PENDING
+                ? "Bổ sung số tiền để em ghi khoản này nhé."
+                : "Em chưa ghi thêm khoản nào. Nói rõ khoản mới muốn ghi giúp em nhé.");
+      }
       if (context != null || response.action() == ChatAction.ASK_CLARIFICATION) {
-        return fromDraft(drafts.apply(response, message, context));
+        return fromDraft(drafts.apply(response, message, context), message.displayName());
       }
       var result = transactions.recordOrContinue(response.transaction(), message);
       return result.draft() == null
-          ? ChatReply.text(confirmation(result.recorded()))
-          : fromDraft(result.draft());
+          ? ChatReply.text(formatter.confirmation(result.recorded(), message.displayName()))
+          : fromDraft(result.draft(), message.displayName());
     } catch (ResourceException exception) {
+      if (exception.getErrorCode() == ErrorCode.TRANSACTION_INPUT_PROCESSED) {
+        return ChatReply.text(
+            "Em đã xử lý tin này trong thao tác sửa/xóa rồi. Xem lại sổ hoặc gửi tin mới nhé.");
+      }
+      if (exception.getErrorCode() == ErrorCode.TRANSACTION_DELETED) {
+        return ChatReply.text(DELETED_REPLY);
+      }
       if (exception.getErrorCode() != ErrorCode.DRAFT_CONTEXT_CHANGED) {
         throw exception;
       }
@@ -95,14 +163,35 @@ public class ChatServiceImpl implements ChatService {
     }
   }
 
+  @Override
+  public ChatReply nextPage(ChatMessage message, TransactionPageRequest request) {
+    validateMessage(message);
+    if (request == null
+        || request.query() == null
+        || request.cursor() == null
+        || request.messageId() <= 0) {
+      throw new ResourceException(ErrorCode.QUERY_INVALID_PARAMETERS);
+    }
+    return view(message, request.query(), request.cursor());
+  }
+
+  private ChatReply view(ChatMessage message, TransactionQuery query, TransactionCursor cursor) {
+    try {
+      var page = queries.view(message, query, cursor);
+      return new ChatReply(formatter.summary(page), null, page);
+    } catch (DataAccessException | TransactionException exception) {
+      throw new ResourceException(ErrorCode.QUERY_FAILED, exception);
+    }
+  }
+
   private ChatReply currentReply(ChatMessage message) {
     var recorded = transactions.findRecorded(message);
     if (recorded.isPresent()) {
-      return ChatReply.text(confirmation(recorded.get()));
+      return ChatReply.text(formatter.confirmation(recorded.get(), message.displayName()));
     }
     return drafts
         .findContext(message)
-        .map(this::fromDraft)
+        .map(context -> fromDraft(context, message.displayName()))
         .orElseThrow(() -> new ResourceException(ErrorCode.DRAFT_CONTEXT_CHANGED));
   }
 
@@ -117,13 +206,16 @@ public class ChatServiceImpl implements ChatService {
     try {
       var context = drafts.cancel(message, draftId);
       if (context.isEmpty()) {
-        return new DraftCancellation(null, "Không có bản nháp đang chờ.", false, null);
+        return new DraftCancellation(null, "Em không có bản nháp nào đang chờ nhé.", false, null);
       }
       var status = context.get().status();
       var reply =
-          status == DraftStatus.CANCELLED
-              ? cancellationConfirmation(context.get().transaction())
-              : "Khoản này đã ghi rồi, không thể hủy bằng nút này.";
+          status == DraftStatus.DELETED
+              ? DELETED_REPLY
+              : status == DraftStatus.CANCELLED
+                  ? formatter.cancellationConfirmation(context.get().transaction())
+                  : "Em đã ghi khoản này rồi. Nếu muốn xóa, mở khoản đó trong danh sách giúp em"
+                      + " nhé.";
       return new DraftCancellation(
           status,
           reply,
@@ -140,13 +232,21 @@ public class ChatServiceImpl implements ChatService {
     }
   }
 
-  private ChatReply fromDraft(DraftContext context) {
+  private ChatReply fromDraft(DraftContext context, String displayName) {
     return switch (context.status()) {
       case PENDING -> new ChatReply(context.questionText(), context.id());
-      case CONFIRMED -> ChatReply.text(confirmation(context.transaction()));
+      case CONFIRMED -> ChatReply.text(formatter.confirmation(context.transaction(), displayName));
+      case DELETED -> ChatReply.text(DELETED_REPLY);
       case CANCELLED ->
-          ChatReply.text("Khoản này đã hủy. Anh gửi tin mới nếu muốn ghi khoản khác nhé.");
+          ChatReply.text("Em đã hủy khoản này rồi. Gửi tin mới nếu muốn ghi khoản khác nhé.");
     };
+  }
+
+  private boolean isPureGreeting(String text) {
+    return text.strip()
+        .toLowerCase(Locale.ROOT)
+        .replaceAll("\\s+", " ")
+        .matches("(?:(?:xin )?chào(?: em)?|(?:hello|hi)(?: em)?|/start)[.!?,]*");
   }
 
   private boolean isCancelCommand(String text) {
@@ -154,108 +254,5 @@ public class ChatServiceImpl implements ChatService {
       case "/cancel", "hủy", "huỷ" -> true;
       default -> false;
     };
-  }
-
-  private ChatResponse interpret(ChatClient client, ChatMessage message, DraftContext context) {
-    String answer;
-    try {
-      var sentAt = context == null ? message.sentAt() : context.originalSentAt();
-      var referenceDate = sentAt.atZone(ledgerTimeZone).toLocalDate();
-      var messages = new ArrayList<Message>();
-      var currentDate = message.sentAt().atZone(ledgerTimeZone).toLocalDate();
-      messages.add(
-          new SystemMessage(
-              "Ngày gửi tin nhắn gốc: "
-                  + referenceDate
-                  + ". Ngày gửi tin nhắn mới: "
-                  + currentDate
-                  + ". Múi giờ: "
-                  + ledgerTimeZone
-                  + ". Ngày tương đối trong tin nhắn mới tham chiếu ngày gửi tin nhắn mới; "
-                  + "giữ ngày đã biết của draft nếu người dùng không sửa ngày."));
-      if (context != null) {
-        messages.add(new UserMessage(context.originalText()));
-        messages.add(
-            new AssistantMessage(
-                "Thông tin draft đang có: "
-                    + jsonMapper.writeValueAsString(context.transaction())
-                    + "\nCâu hỏi hiện tại: "
-                    + context.questionText()));
-      }
-      messages.add(new UserMessage(message.text()));
-      answer = client.prompt().messages(messages).call().content();
-    } catch (RestClientException | TransientAiException | NonTransientAiException exception) {
-      throw new ResourceException(ErrorCode.CHATBOT_UNAVAILABLE, exception);
-    }
-    if (answer == null || answer.isBlank()) {
-      throw new ResourceException(ErrorCode.CHATBOT_EMPTY_RESPONSE);
-    }
-    return parse(answer, context);
-  }
-
-  private ChatResponse parse(String answer, DraftContext context) {
-    ChatResponse response;
-    try {
-      response =
-          jsonMapper
-              .readerFor(ChatResponse.class)
-              .with(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES)
-              .with(DeserializationFeature.FAIL_ON_TRAILING_TOKENS)
-              .with(EnumFeature.FAIL_ON_NUMBERS_FOR_ENUMS)
-              .with(StreamReadFeature.STRICT_DUPLICATE_DETECTION)
-              .readValue(answer);
-    } catch (JacksonException exception) {
-      throw new ResourceException(ErrorCode.CHATBOT_INVALID_RESPONSE, exception);
-    }
-    if (response == null
-        || !validator.validate(response).isEmpty()
-        || !isTransactionConsistent(response, context)) {
-      throw new ResourceException(ErrorCode.CHATBOT_INVALID_RESPONSE);
-    }
-    return response;
-  }
-
-  private boolean isTransactionConsistent(ChatResponse response, DraftContext context) {
-    var data = response.transaction();
-    if (data != null && data.type() == TransactionType.INCOME && data.category() != null) {
-      return false;
-    }
-    return switch (response.action()) {
-      case READY ->
-          data != null && (context != null || (data.type() != null && data.amount() != null));
-      case CHAT -> data == null;
-      case ASK_CLARIFICATION -> true;
-    };
-  }
-
-  private String confirmation(TransactionData saved) {
-    var type = saved.type() == TransactionType.INCOME ? "thu" : "chi";
-    var description = saved.description();
-    var detail = description == null || description.isBlank() ? "" : " — " + description;
-    return "Đã ghi khoản " + type + " " + formatAmount(saved.amount()) + "đ" + detail + ".";
-  }
-
-  private String cancellationConfirmation(TransactionData data) {
-    var description = data.description();
-    String label;
-    if (description != null && !description.isBlank()) {
-      var name = description.strip();
-      if (name.codePointCount(0, name.length()) > 120) {
-        name = name.substring(0, name.offsetByCodePoints(0, 120)) + "…";
-      }
-      label = "“" + name + "”";
-    } else if (data.type() != null) {
-      label = data.type() == TransactionType.INCOME ? "thu" : "chi";
-    } else {
-      label = "đang bổ sung";
-    }
-    var amount = data.amount() == null ? "" : " (" + formatAmount(data.amount()) + "đ)";
-    return "Em hủy khoản " + label + amount + " rồi nhé.";
-  }
-
-  private String formatAmount(BigDecimal amount) {
-    var numbers = NumberFormat.getNumberInstance(Locale.forLanguageTag("vi-VN"));
-    numbers.setMaximumFractionDigits(2);
-    return numbers.format(amount);
   }
 }

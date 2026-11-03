@@ -42,7 +42,13 @@ class EntityMappingTests {
     assertThat(entityManager.getMetamodel().getEntities())
         .extracting(EntityType::getName)
         .containsExactlyInAnyOrder(
-            "User", "UserIdentity", "Transaction", "TransactionDraft", "DraftMessageLink");
+            "User",
+            "UserIdentity",
+            "Transaction",
+            "TransactionDraft",
+            "DraftMessageLink",
+            "DeletedTransactionSource",
+            "TransactionActionInput");
   }
 
   @Test

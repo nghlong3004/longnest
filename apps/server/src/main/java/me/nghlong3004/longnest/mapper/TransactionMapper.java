@@ -1,9 +1,13 @@
 package me.nghlong3004.longnest.mapper;
 
 import java.time.LocalDate;
+import java.util.UUID;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.TransactionData;
+import me.nghlong3004.longnest.model.dto.TransactionResponse;
+import me.nghlong3004.longnest.model.entity.DeletedTransactionSource;
 import me.nghlong3004.longnest.model.entity.Transaction;
+import me.nghlong3004.longnest.model.entity.TransactionActionInput;
 import me.nghlong3004.longnest.model.entity.User;
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
@@ -23,4 +27,13 @@ public interface TransactionMapper {
   Transaction toEntity(TransactionData data, ChatMessage message, User user, LocalDate date);
 
   TransactionData toData(Transaction transaction);
+
+  TransactionResponse toResponse(Transaction transaction);
+
+  TransactionResponse toResponse(TransactionData data, UUID id);
+
+  @Mapping(target = "userId", source = "user.id")
+  DeletedTransactionSource toDeletedSource(Transaction transaction);
+
+  TransactionActionInput toActionInput(ChatMessage message);
 }

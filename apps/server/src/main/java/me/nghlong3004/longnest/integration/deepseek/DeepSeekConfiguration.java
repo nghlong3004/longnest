@@ -45,7 +45,8 @@ public class DeepSeekConfiguration {
             DeepSeekChatOptions.builder()
                 .model(properties.model())
                 .disableThinking()
-                .responseFormat(ResponseFormat.builder().type(ResponseFormat.Type.JSON_OBJECT).build())
+                .responseFormat(
+                    ResponseFormat.builder().type(ResponseFormat.Type.JSON_OBJECT).build())
                 .build())
         .retryTemplate(new RetryTemplate(RetryPolicy.withMaxRetries(0)))
         .build();

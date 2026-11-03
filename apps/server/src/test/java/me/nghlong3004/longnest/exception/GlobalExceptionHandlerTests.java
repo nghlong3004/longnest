@@ -17,7 +17,8 @@ class GlobalExceptionHandlerTests {
     var failure = new IllegalStateException("private API key and user message");
     var unavailable =
         handler.handle(
-            new ResourceException(ErrorCode.CHATBOT_UNAVAILABLE, failure), Locale.forLanguageTag("vi"));
+            new ResourceException(ErrorCode.CHATBOT_UNAVAILABLE, failure),
+            Locale.forLanguageTag("vi"));
     var empty =
         handler.handle(
             new ResourceException(ErrorCode.CHATBOT_EMPTY_RESPONSE), Locale.forLanguageTag("vi"));

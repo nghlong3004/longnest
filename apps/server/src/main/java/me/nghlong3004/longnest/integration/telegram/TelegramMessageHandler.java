@@ -11,6 +11,7 @@ import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
 import me.nghlong3004.longnest.model.dto.DraftCancellation;
+import me.nghlong3004.longnest.model.dto.TransactionPageRequest;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.service.ChatService;
@@ -50,6 +51,8 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
   private final ChatService chatService;
   private final GlobalExceptionHandler exceptionHandler;
   private final TaskScheduler telegramTypingScheduler;
+  private final TelegramTransactionQueryCodec queryCodec;
+  private final TelegramTransactionActions transactionActions;
 
   @Override
   public void consume(List<Update> updates) {
@@ -69,12 +72,16 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
     return message.getChat() != null
         && message.isUserMessage()
         && sender != null
+        && sender.getId() != null
         && !Boolean.TRUE.equals(sender.getIsBot())
-        && properties.user().equals(sender.getId())
-        && properties.user().equals(message.getChatId());
+        && properties.users().contains(sender.getId())
+        && sender.getId().equals(message.getChatId());
   }
 
   private void handleText(Message message, Integer updateId) {
+    if (transactionActions.handleText(message)) {
+      return;
+    }
     var chatId = message.getChatId().toString();
     var typing =
         telegramTypingScheduler.scheduleWithFixedDelay(
@@ -90,7 +97,10 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
       typing.cancel(false);
     }
     try {
-      var first = sendReply(chatId, message.getMessageId(), reply);
+      var first = sendResponse(chatId, message.getMessageId(), reply);
+      if (source != null) {
+        chatService.rememberReply(source, reply);
+      }
       if (reply.draftId() != null) {
         try {
           chatService.registerQuestion(source, reply, first.getMessageId().toString());
@@ -109,8 +119,22 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
     if (!(callback.getMessage() instanceof Message message)
         || !isOwner(message, callback.getFrom())
         || callback.getId() == null
-        || callback.getData() == null
-        || !callback.getData().startsWith(CANCEL_PREFIX)) {
+        || callback.getData() == null) {
+      return;
+    }
+    if (callback.getData().startsWith(TelegramTransactionQueryCodec.PREFIX)) {
+      if (transactionActions.isRevokedPage(message.getChatId().toString(), callback.getData())) {
+        answerCallback(callback.getId(), "Trang cũ đã thay đổi. Hãy dùng danh sách cập nhật.");
+        return;
+      }
+      handleQueryCallback(callback, message);
+      return;
+    }
+    if (callback.getData().startsWith(TelegramTransactionActions.PREFIX)) {
+      transactionActions.handleCallback(callback, message);
+      return;
+    }
+    if (!callback.getData().startsWith(CANCEL_PREFIX)) {
       return;
     }
     UUID draftId;
@@ -130,6 +154,37 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
       }
     } catch (RuntimeException exception) {
       answerCallback(callback.getId(), exceptionHandler.handle(exception, VIETNAMESE));
+    }
+  }
+
+  private void handleQueryCallback(CallbackQuery callback, Message message) {
+    TransactionPageRequest request;
+    try {
+      request = queryCodec.decode(callback.getData());
+    } catch (IllegalArgumentException exception) {
+      answerCallback(callback.getId(), "Nút này không hợp lệ.");
+      return;
+    }
+    // Acknowledge before accessing the database to stop Telegram's button spinner.
+    answerCallback(callback.getId(), null);
+    var source =
+        new ChatMessage(
+            Channel.TELEGRAM,
+            callback.getFrom().getId().toString(),
+            message.getChatId().toString(),
+            Integer.toString(request.messageId()),
+            Instant.now(),
+            "Xem thêm");
+    ChatReply reply;
+    try {
+      reply = chatService.nextPage(source, request);
+    } catch (RuntimeException exception) {
+      reply = ChatReply.text(exceptionHandler.handle(exception, VIETNAMESE));
+    }
+    try {
+      sendResponse(message.getChatId().toString(), request.messageId(), reply);
+    } catch (TelegramApiException exception) {
+      log.warn("Transaction page could not be sent for callback {}", callback.getId());
     }
   }
 
@@ -168,7 +223,11 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
         message.getMessageId().toString(),
         Instant.ofEpochSecond(message.getDate()),
         text,
-        repliedTo == null ? null : repliedTo.getMessageId().toString());
+        repliedTo == null ? null : repliedTo.getMessageId().toString(),
+        ((sender.getFirstName() == null ? "" : sender.getFirstName())
+                + " "
+                + (sender.getLastName() == null ? "" : sender.getLastName()))
+            .strip());
   }
 
   private void sendTyping(String chatId) {
@@ -179,7 +238,20 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
     }
   }
 
+  private Message sendResponse(String chatId, Integer replyToMessageId, ChatReply reply)
+      throws TelegramApiException {
+    return reply.transactions() == null
+        ? sendReply(chatId, replyToMessageId, reply)
+        : transactionActions.sendPage(chatId, replyToMessageId, reply);
+  }
+
   private Message sendReply(String chatId, Integer replyToMessageId, ChatReply reply)
+      throws TelegramApiException {
+    return sendReply(chatId, replyToMessageId, reply, null);
+  }
+
+  private Message sendReply(
+      String chatId, Integer replyToMessageId, ChatReply reply, InlineKeyboardMarkup keyboard)
       throws TelegramApiException {
     var text = reply.text();
     Message first = null;
@@ -203,6 +275,9 @@ public class TelegramMessageHandler implements LongPollingUpdateConsumer {
                 .callbackData(CANCEL_PREFIX + reply.draftId())
                 .build();
         request.setReplyMarkup(new InlineKeyboardMarkup(List.of(new InlineKeyboardRow(cancel))));
+      }
+      if (start == 0 && keyboard != null) {
+        request.setReplyMarkup(keyboard);
       }
       var sent = client.execute(request);
       if (start == 0) {

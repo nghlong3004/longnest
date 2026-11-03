@@ -11,6 +11,8 @@ import org.springframework.data.jpa.repository.Lock;
 
 public interface TransactionDraftRepository extends JpaRepository<TransactionDraft, UUID> {
 
+  Optional<TransactionDraft> findByTransaction_Id(UUID transactionId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<TransactionDraft> findByIdAndUser_IdAndChannelAndChatId(
       UUID id, UUID userId, Channel channel, String chatId);

@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.Lock;
 
 public interface UserIdentityRepository extends JpaRepository<UserIdentity, UUID> {
 
+  Optional<UserIdentity> findFirstByChannelAndExternalUserId(
+      Channel channel, String externalUserId);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   Optional<UserIdentity> findByChannelAndExternalUserId(Channel channel, String externalUserId);
 }

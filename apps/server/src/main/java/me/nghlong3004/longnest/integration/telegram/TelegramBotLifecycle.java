@@ -30,7 +30,8 @@ public class TelegramBotLifecycle implements SmartLifecycle {
       log.info("Telegram bot started");
     } catch (TelegramApiException exception) {
       // SDK exceptions may include request URLs containing the bot token.
-      throw new IllegalStateException("Unable to register Telegram bot; check token and connectivity");
+      throw new IllegalStateException(
+          "Unable to register Telegram bot; check token and connectivity");
     }
   }
 

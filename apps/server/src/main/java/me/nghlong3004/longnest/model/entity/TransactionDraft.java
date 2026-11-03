@@ -245,6 +245,23 @@ public class TransactionDraft {
     this.status = DraftStatus.CANCELLED;
   }
 
+  public void markTransactionDeleted() {
+    if (status != DraftStatus.CONFIRMED) {
+      throw new IllegalStateException("Only confirmed transactions can be deleted");
+    }
+    transaction = null;
+    status = DraftStatus.DELETED;
+    type = null;
+    amount = null;
+    category = null;
+    description = null;
+    location = null;
+    date = null;
+    timeOfDay = null;
+    originalText = "[deleted]";
+    questionText = null;
+  }
+
   private void requirePending() {
     if (status != DraftStatus.PENDING) {
       throw new IllegalStateException("Only pending drafts can be changed");

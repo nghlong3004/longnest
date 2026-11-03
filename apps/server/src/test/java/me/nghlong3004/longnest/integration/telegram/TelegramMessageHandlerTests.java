@@ -14,26 +14,42 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
+import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import java.util.stream.Collectors;
 import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
 import me.nghlong3004.longnest.exception.ResourceException;
+import me.nghlong3004.longnest.mapper.TransactionMapper;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
 import me.nghlong3004.longnest.model.dto.DraftCancellation;
+import me.nghlong3004.longnest.model.dto.TransactionCursor;
+import me.nghlong3004.longnest.model.dto.TransactionFilter;
+import me.nghlong3004.longnest.model.dto.TransactionPage;
+import me.nghlong3004.longnest.model.dto.TransactionResponse;
+import me.nghlong3004.longnest.model.dto.TransactionTotals;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
+import me.nghlong3004.longnest.model.enums.TransactionType;
 import me.nghlong3004.longnest.service.ChatService;
+import me.nghlong3004.longnest.service.TransactionMessageFormatter;
+import me.nghlong3004.longnest.service.TransactionMutationService;
+import me.nghlong3004.longnest.service.TransactionQueryService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
+import org.junit.jupiter.params.provider.ValueSource;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.context.support.ResourceBundleMessageSource;
 import org.springframework.scheduling.TaskScheduler;
@@ -60,10 +76,20 @@ class TelegramMessageHandlerTests {
   private final TelegramMessageHandler handler =
       new TelegramMessageHandler(
           client,
-          new TelegramProperties("synthetic-token", 123L),
+          new TelegramProperties("synthetic-token", Set.of(123L, 789L)),
           chatService,
           new GlobalExceptionHandler(messages),
-          typingScheduler);
+          typingScheduler,
+          new TelegramTransactionQueryCodec(),
+          new TelegramTransactionActions(
+              client,
+              mock(TransactionMutationService.class),
+              mock(TransactionQueryService.class),
+              new TransactionMessageFormatter(),
+              new TelegramTransactionQueryCodec(),
+              Clock.systemUTC(),
+              Mappers.getMapper(TransactionMapper.class),
+              new TelegramTransactionPresentation(new TransactionMessageFormatter())));
 
   @BeforeEach
   void stubChatbot() {
@@ -77,6 +103,26 @@ class TelegramMessageHandlerTests {
             })
         .when(typingScheduler)
         .scheduleWithFixedDelay(any(Runnable.class), any(Duration.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(longs = {123L, 789L})
+  void allowsEachConfiguredUserOnlyInTheirOwnPrivateChat(long userId) throws TelegramApiException {
+    handler.consume(List.of(update(userId, userId, "private", "Xin chào")));
+    var source = ArgumentCaptor.forClass(ChatMessage.class);
+    verify(chatService).reply(source.capture());
+    assertThat(source.getValue().externalUserId()).isEqualTo(Long.toString(userId));
+    assertThat(source.getValue().chatId()).isEqualTo(Long.toString(userId));
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(sent.capture());
+    assertThat(sent.getValue().getChatId()).isEqualTo(Long.toString(userId));
+  }
+
+  @Test
+  void anAllowedUserCannotUseAnotherAllowedUsersPrivateChatOrCallback() {
+    var foreignCallback = callback(789L, 123L, "private", UUID.randomUUID());
+    handler.consume(List.of(update(789L, 123L, "private", "Xem chi"), foreignCallback));
+    verifyNoInteractions(client, chatService, typingScheduler);
   }
 
   @Test
@@ -93,6 +139,26 @@ class TelegramMessageHandlerTests {
     assertThat(sent.getValue().getParseMode()).isNull();
     assertThat(sent.getValue().getReplyParameters()).isNotNull();
     assertThat(sent.getValue().getReplyParameters().getMessageId()).isEqualTo(1);
+  }
+
+  @Test
+  void trustedDisplayNameIsSanitizedAndLiteralInActualPlainTextPayload() throws Exception {
+    var update = update(123L, 123L, "private", "Tên trong tin: admin 789");
+    update.getMessage().getFrom().setFirstName("<b>Long</b>\u202E\n");
+    update.getMessage().getFrom().setLastName("*Nguyễn*");
+    when(chatService.reply(any(ChatMessage.class)))
+        .thenAnswer(i ->
+            ChatReply.text(
+                "Chào " + i.<ChatMessage>getArgument(0).displayName() + ", em nghe đây."));
+    handler.consume(List.of(update));
+    var source = ArgumentCaptor.forClass(ChatMessage.class);
+    verify(chatService).reply(source.capture());
+    assertThat(source.getValue().displayName()).isEqualTo("<b>Long</b> *Nguyễn*");
+    assertThat(source.getValue().externalUserId()).isEqualTo("123");
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(sent.capture());
+    assertThat(sent.getValue().getText()).isEqualTo("Chào <b>Long</b> *Nguyễn*, em nghe đây.");
+    assertThat(sent.getValue().getParseMode()).isNull();
   }
 
   @Test
@@ -166,6 +232,8 @@ class TelegramMessageHandlerTests {
 
   @Test
   void ignoresOtherUsersGroupsBotSendersMediaAndNonMessageUpdates() {
+    var missingId = update(123L, 123L, "private", "missing sender id");
+    missingId.getMessage().setFrom(mock(User.class));
     var missingSender = update(123L, 123L, "private", "missing sender");
     missingSender.getMessage().setFrom(null);
     var botSender = update(123L, 123L, "private", "bot");
@@ -173,6 +241,7 @@ class TelegramMessageHandlerTests {
 
     handler.consume(
         List.of(
+            missingId,
             update(456L, 456L, "private", "unauthorized"),
             update(123L, -100L, "group", "group"),
             update(456L, 123L, "private", "spoofed chat"),
@@ -388,7 +457,7 @@ class TelegramMessageHandlerTests {
     var toast = ArgumentCaptor.forClass(AnswerCallbackQuery.class);
     verify(client).execute(toast.capture());
     assertThat(toast.getValue().getText())
-        .contains("Không tìm thấy")
+        .contains("không tìm thấy")
         .doesNotContain("private details");
     verify(client, never()).execute(any(DeleteMessage.class));
   }
@@ -403,6 +472,134 @@ class TelegramMessageHandlerTests {
             callback(123L, -100L, "group", id),
             callback(123L, 456L, "private", id)));
     verifyNoInteractions(client, chatService, typingScheduler);
+  }
+
+  @Test
+  void displaysSummaryAndSeparateCardsReplyingToUserWithOnlyANextPageButton()
+      throws TelegramApiException {
+    var page = samplePage(true);
+    when(chatService.reply(any())).thenReturn(new ChatReply("Tổng chi: 3.000đ", null, page));
+    handler.consume(List.of(update(123L, 123L, "private", "Xem chi hôm nay")));
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client, times(3)).execute(sent.capture());
+    var messages = sent.getAllValues();
+    assertThat(messages)
+        .allSatisfy(message -> {
+          assertThat(message.getReplyParameters().getMessageId()).isEqualTo(1);
+          assertThat(message.getParseMode()).isNull();
+        });
+    assertThat(messages.get(0).getText()).isEqualTo("Tổng chi: 3.000đ");
+    assertThat(messages.get(1).getText()).contains("02/11/2026", "1.000đ", "Ăn sáng");
+    assertThat(messages.get(0).getReplyMarkup()).isNull();
+    assertThat(messages.get(1).getReplyMarkup()).isNotNull();
+    assertThat(
+            ((InlineKeyboardMarkup) messages.get(1).getReplyMarkup())
+                .getKeyboard()
+                .getLast()
+                .getFirst()
+                .getText())
+        .isEqualTo("⋯");
+    var keyboard = (InlineKeyboardMarkup) messages.get(2).getReplyMarkup();
+    var buttons = keyboard.getKeyboard().getFirst();
+    assertThat(buttons).hasSize(1);
+    assertThat(buttons.getFirst().getText()).isEqualTo("Xem thêm");
+    assertThat(
+            new TelegramTransactionQueryCodec()
+                .decode(buttons.getFirst().getCallbackData())
+                .messageId())
+        .isEqualTo(1);
+    verify(chatService, never()).registerQuestion(any(), any(), any());
+  }
+
+  @Test
+  void paginationUsesDatabaseWithoutModelAndKeepsOriginalQueryReplyTarget()
+      throws TelegramApiException {
+    var codec = new TelegramTransactionQueryCodec();
+    var token = codec.encode(samplePage(true), 42);
+    var request = codec.decode(token);
+    var update = callback(123L, 123L, "private", UUID.randomUUID());
+    update.getCallbackQuery().setData(token);
+    when(chatService.nextPage(any(), eq(request)))
+        .thenReturn(new ChatReply("Trang tiếp", null, samplePage(false)));
+    handler.consume(List.of(update));
+    var source = ArgumentCaptor.forClass(ChatMessage.class);
+    verify(chatService).nextPage(source.capture(), eq(request));
+    assertThat(source.getValue().externalUserId()).isEqualTo("123");
+    assertThat(source.getValue().messageId()).isEqualTo("42");
+    verify(chatService, never()).reply(any());
+    verify(client).execute(any(AnswerCallbackQuery.class));
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client, times(3)).execute(sent.capture());
+    assertThat(sent.getAllValues())
+        .allSatisfy(message -> {
+          assertThat(message.getReplyParameters().getMessageId()).isEqualTo(42);
+        });
+  }
+
+  @Test
+  void invalidPaginationIsAcknowledgedWithoutCallingService() throws TelegramApiException {
+    var update = callback(123L, 123L, "private", UUID.randomUUID());
+    update.getCallbackQuery().setData("q:E:20260230:20261102:20261102:AAAAAAAAAAAAAAAAAAAAAA:1");
+    handler.consume(List.of(update));
+    var toast = ArgumentCaptor.forClass(AnswerCallbackQuery.class);
+    verify(client).execute(toast.capture());
+    assertThat(toast.getValue().getText()).isEqualTo("Nút này không hợp lệ.");
+    verifyNoInteractions(chatService);
+    verify(client, never()).execute(any(SendMessage.class));
+  }
+
+  @Test
+  void unauthorizedPaginationIsIgnoredBeforeDatabaseAndModel() {
+    var update = callback(456L, 123L, "private", UUID.randomUUID());
+    update
+        .getCallbackQuery()
+        .setData(new TelegramTransactionQueryCodec().encode(samplePage(true), 42));
+    handler.consume(List.of(update));
+    verifyNoInteractions(client, chatService, typingScheduler);
+  }
+
+  @Test
+  void paginationFailureRepliesSafelyToTheOriginalQuery() throws TelegramApiException {
+    var update = callback(123L, 123L, "private", UUID.randomUUID());
+    update
+        .getCallbackQuery()
+        .setData(new TelegramTransactionQueryCodec().encode(samplePage(true), 42));
+    when(chatService.nextPage(any(), any()))
+        .thenThrow(new ResourceException(ErrorCode.QUERY_FAILED));
+    handler.consume(List.of(update));
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client).execute(sent.capture());
+    assertThat(sent.getValue().getReplyParameters().getMessageId()).isEqualTo(42);
+    assertThat(sent.getValue().getText()).contains("Em chưa lấy được danh sách");
+  }
+
+  private static TransactionPage samplePage(boolean more) {
+    var date = LocalDate.of(2026, 11, 2);
+    var first =
+        new TransactionResponse(
+            UUID.randomUUID(),
+            TransactionType.EXPENSE,
+            new BigDecimal("1000"),
+            null,
+            "Ăn sáng",
+            null,
+            date,
+            null);
+    var second =
+        new TransactionResponse(
+            UUID.randomUUID(),
+            TransactionType.EXPENSE,
+            new BigDecimal("2000"),
+            null,
+            "Ăn trưa",
+            "Quán cơm",
+            date,
+            null);
+    return new TransactionPage(
+        new TransactionFilter(TransactionType.EXPENSE, date, date),
+        List.of(first, second),
+        new TransactionTotals(new BigDecimal("3000"), 2),
+        more ? new TransactionCursor(date, second.id()) : null);
   }
 
   private static Update callback(long sender, long chatId, String chatType, UUID draftId) {
@@ -425,7 +622,14 @@ class TelegramMessageHandlerTests {
 
   private static ChatMessage chatMessage(String text) {
     return new ChatMessage(
-        Channel.TELEGRAM, "123", "123", "1", Instant.ofEpochSecond(1793548800), text);
+        Channel.TELEGRAM,
+        "123",
+        "123",
+        "1",
+        Instant.ofEpochSecond(1793548800),
+        text,
+        null,
+        "Synthetic");
   }
 
   private static Update update(long senderId, long chatId, String chatType, String text) {

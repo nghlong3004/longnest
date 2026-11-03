@@ -5,6 +5,7 @@ import me.nghlong3004.longnest.exception.ResourceException;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
 import me.nghlong3004.longnest.model.dto.DraftCancellation;
+import me.nghlong3004.longnest.model.dto.TransactionPageRequest;
 
 /** Provides replies to incoming chat messages. */
 public interface ChatService {
@@ -27,6 +28,23 @@ public interface ChatService {
    * @throws RuntimeException if an unexpected client resolution or processing error occurs
    */
   ChatReply reply(ChatMessage message);
+
+  /**
+   * Retains a completed reply, including an adapter-localized error, as bounded history only.
+   * Duplicate source delivery does not add an exchange or grant financial authority.
+   */
+  void rememberReply(ChatMessage message, ChatReply reply);
+
+  /**
+   * Retrieves another bounded transaction page without calling the model or changing a draft.
+   *
+   * @param message trusted sender and conversation; owner is never supplied by the callback data
+   * @param request fixed inclusive dates, transaction type, cursor and original query message ID
+   * @return database totals and stored transactions for this sender only
+   * @throws ResourceException if the filter/cursor is invalid or database access fails
+   * @throws IllegalArgumentException if the incoming sender metadata is invalid
+   */
+  ChatReply nextPage(ChatMessage message, TransactionPageRequest request);
 
   /**
    * Registers the actual ID returned when the adapter delivers a clarification question.

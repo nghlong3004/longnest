@@ -7,15 +7,23 @@ MapStruct chỉ ánh xạ dữ liệu; ownership, ngày mặc định và lifecy
 
 ## Luồng hiện tại
 
-- Chỉ tin nhắn riêng của Telegram user cấu hình mới được xử lý. Group, bot sender,
+- `LONGNEST_TELEGRAM_USERS` là danh sách ID được phép, ngăn cách bằng dấu phẩy.
+  Mỗi người chỉ dùng chat riêng của chính mình; dữ liệu tra theo identity của người gửi.
+  Giữ fallback `LONGNEST_TELEGRAM_USER` cho cấu hình cũ.
+- Chỉ tin nhắn riêng của Telegram user trong danh sách mới được xử lý. Group, bot sender,
   media, callback của người khác hoặc chat khác không đi tới service/model.
 - `ChatMessage` mang ID người gửi, kênh, chat, message, timestamp và reply-to do
-  adapter cung cấp. LLM không được quyết định owner hoặc ID nguồn.
-- DeepSeek JSON mode trả `ChatResponse`: `action`, `transaction`, `reply`.
+  adapter cung cấp. Tên hiển thị first/last cũng chỉ lấy từ sender Telegram đã được
+  xác thực; bỏ control/bidi/format, gộp khoảng trắng và giới hạn 80 Unicode code point.
+  Tên là nhãn hiển thị tùy chọn, không phải identity hay chỉ dẫn. LLM không được
+  quyết định owner hoặc ID nguồn; không lấy tên từ body/model để thay metadata.
+- DeepSeek JSON mode trả `ChatResponse`: `action`, `transaction`, `reply`, `query`.
   Jackson 3 và Jakarta Validation kiểm tra JSON, enum, số tiền và dữ liệu liên quan.
   Từ chối trường lạ/trùng, enum dạng số và nội dung dư sau JSON.
 - `READY` mới: lưu giao dịch rồi backend tạo câu từ giá trị đã commit, ví dụ
-  `Đã ghi khoản chi 45.000đ — Ăn trưa.` Không gửi lời xác nhận sẵn của LLM.
+  `Em đã ghi khoản chi 45.000đ — Ăn trưa rồi nhé, Long.` khi có tên đáng tin dùng được;
+  thiếu tên thì bỏ phần gọi tên. Không gửi lời xác nhận sẵn của LLM.
+  Số tiền/nội dung lấy nguyên giá trị đã commit, không thay chữ hàng loạt trong dữ liệu.
 - `ASK_CLARIFICATION`: lưu hoặc cập nhật một draft `PENDING`, rồi trả `ChatReply`
   với text và draft ID. Telegram gắn nút **Hủy** dưới câu hỏi và đăng ký ID tin
   câu hỏi sau khi gửi thành công.
@@ -28,25 +36,121 @@ MapStruct chỉ ánh xạ dữ liệu; ownership, ngày mặc định và lifecy
 - Khi đủ rõ, tạo giao dịch và chuyển draft sang `CONFIRMED` cùng một transaction
   DB. Giữ message ID gốc làm nguồn giao dịch. Lưu lỗi rollback cả việc bổ sung và
   xác nhận; draft đang chờ vẫn có thể được trả lời lại.
+- `QUERY` chỉ đọc giao dịch đã ghi, giữ nguyên draft; backend tạo tổng tiền và danh sách từ DB.
 - `CHAT` chỉ trả lời, giữ draft. Khi anh muốn ghi một khoản khác trong lúc draft
   còn chờ, prompt nhắc hủy draft hiện tại trước để tránh ghép hai khoản.
+- Lời chào thuần cả tin (`Xin chào`, `Chào`, `Chào em`, `Xin chào em`, `hello`/`hi`
+  có thể thêm `em`, `/start`,
+  có thể thêm dấu câu cuối) được trả lời xác định bằng tên metadata: `Em chào Long,
+  cần ghi hay xem thu chi cứ nhắn em nhé.` Không có tên dùng được thì bỏ địa chỉ,
+  không máy móc “Chào bạn”. Kiểm tra receipt đã xử lý/đã ghi/draft replay vẫn đi
+  trước lời chào; lời chào không bổ sung hay hủy draft. Tin chào kèm ghi/xem giao
+  dịch không bị bắt vào nhánh này và vẫn gọi model như trước. Nhánh lời chào không
+  thêm model call; chế độ echo khi không có ChatClient giữ nguyên.
 - Câu trả lời trùng, Reply tới câu hỏi cũ và nút cũ đều tra trạng thái DB; draft
   `CONFIRMED`/`CANCELLED` không được mở lại. Tin riêng cùng nội dung vẫn là khoản riêng.
 
 Ví dụ: `Ăn trưa` → bot hỏi số tiền + nút Hủy → `45` còn mơ hồ → bot hỏi tiếp →
 `45k` → lưu 45.000đ cho ăn trưa và xác nhận. `45k` có thể là tin thường hoặc Reply.
 
+## Xem khoản thu/chi
+
+Ví dụ tin nhắn:
+
+- `Xem khoản chi hôm nay` → `TODAY`.
+- `Xem khoản chi hôm qua` → `YESTERDAY`, chỉ riêng ngày hôm qua.
+- `Xem khoản chi từ hôm qua tới giờ` → `SINCE_YESTERDAY`, gồm hôm qua và hôm nay.
+- `Xem chi tiêu từ đầu tháng tới giờ` → `THIS_MONTH`, đầu tháng đến ngày gửi tin.
+- `Xem khoản thu tháng trước` → `LAST_MONTH`, cả tháng lịch trước đó.
+- `Anh muốn xem tất cả khoản chi từ tháng trước tới tháng này` → `SINCE_LAST_MONTH`,
+  đầu tháng trước đến ngày gửi tin mới; ngày 02/11/2026 cho 01/10/2026 → 02/11/2026.
+- `Xem khoản chi từ 20/10/2026 tới giờ` → `SINCE_DATE`.
+- `Xem khoản chi từ 01/10/2026 đến 15/10/2026` → `CUSTOM`.
+
+QUERY có `transaction=null` và `query={type, period, from, to}`. Type bắt buộc thu
+hoặc chi; các kỳ tương đối để from/to null. Backend dùng ngày **tin yêu cầu xem**
+theo múi giờ sổ, không dùng ngày gốc của draft. CUSTOM có cả hai ngày, SINCE_DATE
+chỉ có from. Khoảng ngày bao gồm hai đầu; ngày đảo ngược bị từ chối. Chỉ hỏi trường
+thật sự còn thiếu, không bắt gửi lại cả yêu cầu. `chi tiêu` đã rõ là EXPENSE;
+`gần đây` chỉ cần hỏi khoảng thời gian và nhớ loại chi. Lượt sau `từ tháng trước
+tới tháng này` tiếp tục yêu cầu xem, không bổ sung draft tài chính. Backend có
+recovery chỉ đọc hẹp cho câu đầy đủ trên (kể cả typo `Anh muốn hết tất cả khoản chi ...`)
+và câu tiếp theo chỉ có kỳ tương đối, tránh vòng lặp CHAT của model. Không dùng
+recovery này để ghi dữ liệu hoặc đoán ngày cụ thể/ngôn ngữ ngoài các mẫu hỗ trợ.
+
+`TransactionQueryService` tra identity từ người gửi đã xác thực rồi lọc user ID,
+loại và ngày. Không tạo user/identity/draft/receipt mới. Được xem trong lúc draft
+đang chờ hoặc Reply vào câu hỏi cũ; các guard chống ghi vào draft đã đóng vẫn giữ.
+Receipt của chính tin đã xử lý tiếp tục được replay trước khi gọi model.
+
+Một lượt có tin tổng tiền/số khoản cho **toàn khoảng**, sau đó tối đa 5 tin giao
+dịch riêng, đều native Reply vào tin yêu cầu xem. Nội dung/địa điểm dài được rút gọn
+khi hiển thị, không thay DB. Mỗi thẻ có nút **⋯** cho Sửa/Xóa. Nếu còn dữ liệu, tin cuối có
+**Xem thêm**; nút gọi DB trực tiếp, không gọi LLM, giữ ngày và tin Reply gốc.
+
+## Sửa và xóa giao dịch đã ghi
+
+- **⋯ → Sửa → chọn trường → nhập giá trị → Trước/Sau → Lưu hoặc Hủy**.
+  Trường được hỗ trợ: số tiền, ngày, loại thu/chi, danh mục, nội dung, địa điểm, buổi.
+  Số tiền nhận số dương tối đa hai chữ số lẻ và hậu tố `k`/`K` không mơ hồ:
+  `50k` → bản xem trước `50.000đ`; không nhận dấu phân cách hàng nghìn hay NLP.
+  Ngày nhập `YYYY-MM-DD`; enum có danh sách lựa chọn trong hướng dẫn nhập.
+  Nhập `-` để bỏ trường tùy chọn. Nội dung/địa điểm mới tối đa 500 ký tự;
+  dữ liệu dài đã lưu ở trường không sửa được giữ nguyên. Đổi sang thu sẽ bỏ
+  danh mục chi, thể hiện trong bản xem trước. Không dùng LLM cho thao tác này.
+  Bản xem trước chỉ dùng ngữ cảnh nhận diện gọn, hiện đầy đủ giá trị cũ/mới của
+  trường đang sửa (kể cả text cũ dài), và ghi rõ trường khác giữ nguyên cùng
+  thay đổi danh mục suy ra khi đổi loại. Không dùng phần rút gọn của thẻ để xác nhận.
+  Nếu dài, chia thành tin tối đa 4096 UTF-16 units, không cắt đôi emoji; chỉ tin
+  cuối có Lưu/Hủy, token gắn đúng tin cuối và chỉ có hiệu lực khi gửi đủ bản xem trước.
+  Token bước trước bị vô hiệu hóa. Nếu gửi dở thất bại, không bật Lưu; có thể
+  nhập lại hoặc Hủy (kể cả `/cancel`), không đổi sổ hay draft tạo khoản.
+- **⋯ → Xóa** nêu ID khoản, số tiền, ngày và việc xóa vĩnh viễn, không hoàn tác.
+  Chỉ nút **Xóa vĩnh viễn** mới xóa dòng `transactions`. Hủy và `/cancel` khi
+  đang nhập/xem trước chỉ đóng thao tác sửa; không đổi sổ hay draft/receipt tạo khoản.
+  Tin nhập đã xử lý chỉ thêm receipt định danh riêng cho thao tác sửa/xóa.
+- Token ngẫu nhiên chỉ tham chiếu state phía server, gắn ID giao dịch ổn định,
+  chat/owner và đúng tin bot. Mỗi bước kiểm tra lại owner/channel/chat và version
+  DB; token bước trước và confirmation đã dùng không còn hiệu lực. Session thao
+  tác hết hạn sau 15 phút, độc lập hoàn toàn với draft tạo khoản.
+  `transaction_action_inputs` chỉ lưu định danh các tin đã nhận trong thao tác,
+  không lưu nội dung. Replay của giá trị nhập hay `/cancel` không được chạy lại
+  luồng tạo khoản, kể cả sau restart.
+- Flyway V3 thêm version, trạng thái draft `DELETED` và bảng
+  `deleted_transaction_sources` chỉ giữ định danh nguồn chống replay. Draft đã
+  confirmed được bỏ FK và chuyển `DELETED` trước khi xóa ledger row trong cùng
+  transaction; xóa payload tài chính/text của draft, giữ link nguồn để tin cũ
+  không tạo lại khoản. V1/V2 không sửa.
+- Sau DB commit, bot yêu cầu xóa native mọi thẻ của khoản vừa xóa đã theo dõi.
+  Nếu Telegram từ chối (ví dụ tin quá cũ), bot sửa thẻ thành “đã xóa khỏi sổ” và
+  bỏ nút. Đây là best effort: nếu Telegram từ chối cả sửa/gửi thì không thể cập
+  nhật chữ trên client, nhưng token cũ đã bị vô hiệu hóa trên server. Lỗi Telegram
+  không rollback DB và không báo sai thành lỗi tài chính.
+- Mọi query view đã gửi trong tiến trình hiện tại (kể cả thẻ trùng/lượt Xem thêm)
+  được đánh dấu không còn hiện hành và bỏ nút, rồi gửi lại trang đầu/tổng mới theo
+  đúng filter và tin yêu cầu gốc. Việc reset trang tránh sót/lặp do ngày hoặc loại
+  đổi làm khoản rời filter/thứ tự. Pagination token cũ không còn dùng được nếu
+  không trùng cursor hợp lệ của trang mới. Không sửa dữ liệu của người khác.
+
+State giao diện nằm trong bộ nhớ của một bot instance; restart bỏ session/token
+sửa cũ (bấm lại nhận yêu cầu xem danh sách mới), không mất thay đổi đã commit hay
+receipt chống replay trong DB. Thẻ/query đã gửi trước restart không có registry để
+làm mới tự động. Tin mới chưa từng được nhận trước restart đi theo luồng chat
+thường, không tự khôi phục bước nhập sửa; cần mở query mới để tiếp tục sửa.
+Registry và chi phí refresh tăng theo lịch sử view trong vòng đời tiến trình;
+không có job nền hay retry bền vững cho Telegram. Nếu giao diện cập nhật thất bại, yêu cầu
+xem lại danh sách để đọc DB hiện hành. Kiểm tra tự động dùng TelegramClient giả;
+chưa xác nhận UX trong Telegram thật. Copy nói rõ khi sổ đã đổi nhưng tin hiển thị
+chưa làm mới/gỡ được; không trộn lỗi hiển thị sau commit với lỗi thay đổi dữ liệu.
+
+Dùng chung `TransactionPage`/`TransactionCursor`; sắp ngày giảm dần rồi UUID giảm
+dần để phân trang keyset ổn định khi cùng ngày. UUID không thể hiện thứ tự thời gian
+trong ngày. Tổng và danh sách mỗi lượt đọc trong cùng transaction REPEATABLE_READ;
+giữa hai lượt, giao dịch mới có thể làm đổi tổng. Callback `q:` mang type, ba ngày,
+UUID dạng Base64URL và ID tin yêu cầu; tối đa 64 byte, không chứa owner. Callback
+được kiểm tra lại người gửi/chat và phạm vi trước khi truy vấn. Không cần migration.
+
 ## Hủy và xóa câu hỏi
-
-### Hiệu ứng tan biến
-
-Telegram gọi hiệu ứng này là [Thanos Snap](https://telegram.org/blog/calls-and-bots#thanos-snap-effect-when-deleting-messages).
-Nó do client hiển thị khi nhận sự kiện xóa; Bot API `deleteMessage` chỉ nhận chat ID
-và message ID, không có tham số ép animation. Bot dùng xóa native. Trong
-[mã Android](https://github.com/DrKLO/Telegram/blob/master/TMessagesProj/src/main/java/org/telegram/ui/ChatActivity.java#L26695),
-client xét thêm khả năng hỗ trợ/cài đặt `FLAG_CHAT_THANOS` và tuổi tin tối thiểu
-2 giây trong chat bot. Vì vậy bot không bảo đảm hiệu ứng trên mọi ứng dụng hoặc
-cấu hình. Không dùng hiệu ứng của tin gửi (`message_effect_id`) thay cho hiệu ứng xóa.
 
 Nút inline dùng `cancel_draft:<UUID>`; backend kiểm tra owner/channel/chat của
 UUID đó, không tin callback data như bằng chứng quyền sở hữu. Hủy thành công giữ
@@ -64,9 +168,39 @@ Lệnh `/cancel`, `hủy` hoặc `huỷ` cũng hủy draft hiện tại mà khô
 
 ## Ngữ cảnh, ngày và tính nhất quán
 
-- Context gồm tin gốc, các trường đang biết và câu hỏi hiện tại, không phải toàn
-  bộ lịch sử chat. Nội dung người dùng luôn ở `UserMessage`; không nâng nội dung
-  đó thành system instructions. Prompt ở `prompts/transaction-chat-system.txt`.
+- Model nhận tối đa 6 cặp user/bot đã hoàn tất, theo role và thứ tự thời gian, mỗi
+  phía lịch sử tối đa 1000 Unicode code point; tin mới giữ nguyên. Lưu cả câu trả lời
+  thực do backend tạo (xác nhận/tổng/danh sách), không chỉ ví dụ few-shot. Scope là
+  channel + sender đáng tin + private chat; trùng source không thêm lượt. Tin đến
+  muộn không đẩy context lùi về trước hay đưa lượt tương lai vào prompt. Các lượt
+  cùng scope được tuần tự hóa khi diễn giải; khóa stripe và tối đa 128 conversation
+  theo LRU chặn tăng bộ nhớ không giới hạn. History mất khi restart/evict, draft
+  và receipt DB không mất. Nút/edit input có luồng riêng, không trở thành chỉ dẫn
+  ghi khoản mới.
+- Draft đang chờ vẫn cung cấp tin gốc, trường đã biết và câu hỏi hiện tại riêng.
+  History không phải quyền ghi mới: backend chặn READY cũ trên lời cảm ơn, câu xem,
+  câu chỉ có số tiền dạng số không có draft hoặc câu tiếp nối mơ hồ đã nhận diện. Chỉ draft
+  đang chờ được dùng để hoàn thiện phần tài chính. Giữ nguyên source receipt,
+  owner/date gate, /cancel và receipt của tin sửa khoản.
+  Guard chỉ từ chối các dạng tiếp nối mơ hồ đã biết, không dùng whitelist động từ/
+  mục đích và không bắt số tiền phải viết bằng chữ số. READY hợp lệ cho `Cà phê 35k`,
+  `Tiền điện 500k`, `Taxi 50k` hoặc số tiền viết bằng chữ vẫn đi theo luồng hiện có,
+  dù có hay không có history. Draft có thể nhận câu trả lời số tiền viết bằng chữ;
+  `hôm nay` trả lời câu hỏi ngày của draft khi chưa có ngữ cảnh query thực sự.
+  Chỉ một lần gọi model mỗi tin cần diễn giải; không thêm lần kiểm tra tách history.
+  Ngoài các dạng từ chối hẹp, vẫn tin bước trích xuất hiện có từ tin mới/draft;
+  đây không phải bằng chứng độc lập cho ngữ nghĩa của mọi trường model đề xuất.
+  READY ghi mới không được bỏ ngày slash/ISO đã nêu rõ với `ngày` rồi âm thầm dùng
+  ngày gửi tin. Câu trả lời số tiền dạng `50/2` không bị coi thành câu trả lời ngày.
+- Nội dung người dùng luôn ở `UserMessage`; tên hiển thị nằm trong block JSON
+  user-role riêng, không đưa vào system instructions hay đổi owner. Bot xưng em,
+  ưu tiên tên dùng được khi chào/gọi trực tiếp thay vì “bạn”, không suy giới tính.
+  Xác nhận ghi có thể gọi tên một lần; thẻ giao dịch, tổng và các lỗi/hướng dẫn lặp
+  bỏ cách gọi không cần thiết, không ép tên vào mỗi dòng. Thiếu tên dùng câu trung tính
+  tự nhiên không có địa chỉ. Lớp trình bày bỏ surrogate UTF-16 lẻ ở tên, kể cả trước
+  khi chuyển metadata tới model; không sửa body/nội dung giao dịch hay quy tắc identity.
+  Plain text/no parseMode giữ tên dạng markup
+  vô hại về định dạng. Prompt ở `prompts/transaction-chat-system.txt`.
 - Không nói ngày: dùng ngày gửi tin gốc theo `LONGNEST_LEDGER_TIME_ZONE` (mặc định
   `Asia/Ho_Chi_Minh`). Draft giữ timestamp gốc qua restart và các lượt hỏi.
 - Ngày tương đối trong câu trả lời mới dùng ngày gửi câu trả lời đó; ngày đã biết
@@ -110,6 +244,10 @@ Câu hỏi chỉ có một nút Hủy ở phần đầu.
 | `DRAFT_NOT_FOUND` | Không có draft phù hợp với owner/chat |
 | `DRAFT_UPDATE_FAILED` | Không cập nhật/hủy được draft |
 | `DRAFT_CONTEXT_CHANGED` | Context đổi trong lúc model chạy; nạp lại trạng thái đã commit |
+| `QUERY_INVALID_PARAMETERS` | Loại, khoảng ngày hoặc cursor xem chưa hợp lệ |
+| `QUERY_FAILED` | Không lấy được danh sách giao dịch |
+| `TRANSACTION_DELETED` | Nguồn cũ của khoản đã xóa, không tạo lại ledger row |
+| `TRANSACTION_INPUT_PROCESSED` | Tin thuộc thao tác sửa/xóa đã xử lý, không diễn giải thành khoản mới |
 | `INTERNAL_ERROR` | Lỗi ngoài dự kiến |
 
 `ResourceException` giữ mã enum và cause; `GlobalExceptionHandler` chọn thông báo

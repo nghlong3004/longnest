@@ -11,6 +11,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import jakarta.validation.constraints.Digits;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -26,6 +27,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
+import me.nghlong3004.longnest.model.dto.TransactionData;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.TimeOfDay;
 import me.nghlong3004.longnest.model.enums.TransactionCategory;
@@ -46,6 +48,10 @@ public class Transaction {
   @Id
   @GeneratedValue(strategy = GenerationType.UUID)
   private UUID id;
+
+  @Version
+  @Column(nullable = false)
+  private long version;
 
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "user_id", nullable = false)
@@ -117,12 +123,9 @@ public class Transaction {
       String messageId) {
     this.user = Objects.requireNonNull(user, "User is required");
     this.type = Objects.requireNonNull(type, "Transaction type is required");
-    this.amount =
-        Objects.requireNonNull(amount, "Amount is required").setScale(2, RoundingMode.UNNECESSARY);
-    if (this.amount.signum() <= 0 || this.amount.precision() > 19) {
-      throw new IllegalArgumentException("Amount must be positive and fit NUMERIC(19,2)");
-    }
-    this.date = Objects.requireNonNull(date, "Transaction date is required");
+    this.amount = validatedAmount(amount);
+    validateDetails(type, category, date);
+    this.date = date;
     this.channel = Objects.requireNonNull(channel, "Channel is required");
     if (chatId == null || chatId.isBlank() || messageId == null || messageId.isBlank()) {
       throw new IllegalArgumentException("Source chat and message IDs are required");
@@ -133,5 +136,36 @@ public class Transaction {
     this.timeOfDay = timeOfDay;
     this.chatId = chatId;
     this.messageId = messageId;
+  }
+
+  public void revise(TransactionData data) {
+    Objects.requireNonNull(data, "Transaction details are required");
+    validateDetails(data.type(), data.category(), data.date());
+    var amount = validatedAmount(data.amount());
+    this.type = data.type();
+    this.amount = amount;
+    this.category = data.category();
+    this.description = data.description();
+    this.location = data.location();
+    this.date = data.date();
+    this.timeOfDay = data.timeOfDay();
+  }
+
+  private static BigDecimal validatedAmount(BigDecimal amount) {
+    var normalized =
+        Objects.requireNonNull(amount, "Amount is required").setScale(2, RoundingMode.UNNECESSARY);
+    if (normalized.signum() <= 0 || normalized.precision() > 19) {
+      throw new IllegalArgumentException("Amount must be positive and fit NUMERIC(19,2)");
+    }
+    return normalized;
+  }
+
+  private static void validateDetails(
+      TransactionType type, TransactionCategory category, LocalDate date) {
+    Objects.requireNonNull(type, "Transaction type is required");
+    Objects.requireNonNull(date, "Transaction date is required");
+    if (type == TransactionType.INCOME && category != null) {
+      throw new IllegalArgumentException("Income cannot have an expense category");
+    }
   }
 }

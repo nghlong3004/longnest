@@ -13,6 +13,9 @@ import org.springframework.transaction.TransactionException;
 /** Persists transactions proposed by the chatbot after application validation. */
 public interface TransactionService {
 
+  /** Whether a source was consumed by an edit/delete interaction rather than creation. */
+  boolean isMutationInput(ChatMessage message);
+
   /**
    * Finds a recorded message for this owner without creating identity or ledger records.
    *

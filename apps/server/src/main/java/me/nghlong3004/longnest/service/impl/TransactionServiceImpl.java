@@ -17,7 +17,9 @@ import me.nghlong3004.longnest.model.entity.User;
 import me.nghlong3004.longnest.model.entity.UserIdentity;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
+import me.nghlong3004.longnest.repository.DeletedTransactionSourceRepository;
 import me.nghlong3004.longnest.repository.DraftMessageLinkRepository;
+import me.nghlong3004.longnest.repository.TransactionActionInputRepository;
 import me.nghlong3004.longnest.repository.TransactionDraftRepository;
 import me.nghlong3004.longnest.repository.TransactionRepository;
 import me.nghlong3004.longnest.service.TransactionService;
@@ -36,10 +38,26 @@ public class TransactionServiceImpl implements TransactionService {
   private final TransactionDraftRepository drafts;
   private final DraftMessageLinkRepository links;
   private final DraftMapper draftMapper;
+  private final DeletedTransactionSourceRepository deletedSources;
+  private final TransactionActionInputRepository actionInputs;
+
+  @Override
+  @Transactional(readOnly = true)
+  public boolean isMutationInput(ChatMessage message) {
+    return actionInputs.existsByChannelAndExternalUserIdAndChatIdAndMessageId(
+        message.channel(), message.externalUserId(), message.chatId(), message.messageId());
+  }
+
+  private void rejectMutationInput(ChatMessage message) {
+    if (isMutationInput(message)) {
+      throw new ResourceException(ErrorCode.TRANSACTION_INPUT_PROCESSED);
+    }
+  }
 
   @Override
   @Transactional
   public Optional<TransactionData> findRecorded(ChatMessage message) {
+    rejectMutationInput(message);
     return identities
         .find(message)
         .flatMap(identity -> findBySource(identity, message))
@@ -49,6 +67,7 @@ public class TransactionServiceImpl implements TransactionService {
   @Override
   @Transactional
   public TransactionRecordingResult recordOrContinue(TransactionData data, ChatMessage message) {
+    rejectMutationInput(message);
     var identity = identities.resolve(message);
     var existing = findBySource(identity, message);
     if (existing.isPresent()) {
@@ -82,6 +101,7 @@ public class TransactionServiceImpl implements TransactionService {
   }
 
   private Transaction recordSource(TransactionData data, ChatMessage message, UUID draftId) {
+    rejectMutationInput(message);
     var identity = identities.resolve(message);
     var user = identity.getUser();
     if (draftId != null) {
@@ -124,6 +144,11 @@ public class TransactionServiceImpl implements TransactionService {
   }
 
   private Optional<Transaction> findBySource(UserIdentity identity, ChatMessage message) {
+    rejectMutationInput(message);
+    if (deletedSources.existsByUserIdAndChannelAndChatIdAndMessageId(
+        identity.getUser().getId(), message.channel(), message.chatId(), message.messageId())) {
+      throw new ResourceException(ErrorCode.TRANSACTION_DELETED);
+    }
     return transactions.findFirstByUser_IdAndChannelAndChatIdAndMessageId(
         identity.getUser().getId(), message.channel(), message.chatId(), message.messageId());
   }

@@ -20,7 +20,11 @@ import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.service.ChatService;
+import me.nghlong3004.longnest.service.ConversationHistory;
 import me.nghlong3004.longnest.service.DraftService;
+import me.nghlong3004.longnest.service.TransactionMessageFormatter;
+import me.nghlong3004.longnest.service.TransactionModelInterpreter;
+import me.nghlong3004.longnest.service.TransactionQueryService;
 import me.nghlong3004.longnest.service.TransactionService;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
@@ -138,7 +142,7 @@ class ChatServiceImplTests {
   void rejectsEmptyModelOutputSoTelegramCanReportFailure() {
     var service = service(modelReturning("   "));
 
-    assertThatThrownBy(() -> service.reply(message("Xin chào")))
+    assertThatThrownBy(() -> service.reply(message("Giới thiệu cách ghi thu chi")))
         .isInstanceOfSatisfying(
             ResourceException.class,
             exception ->
@@ -153,7 +157,7 @@ class ChatServiceImplTests {
     when(model.call(any(Prompt.class))).thenThrow(failure);
     var service = service(model);
 
-    assertThatThrownBy(() -> service.reply(message("Xin chào")))
+    assertThatThrownBy(() -> service.reply(message("Giới thiệu cách ghi thu chi")))
         .isInstanceOfSatisfying(
             ResourceException.class,
             exception -> {
@@ -171,7 +175,8 @@ class ChatServiceImplTests {
     when(model.call(any(Prompt.class))).thenThrow(failure);
     var service = service(model);
 
-    assertThatThrownBy(() -> service.reply(message("Xin chào"))).isSameAs(failure);
+    assertThatThrownBy(() -> service.reply(message("Giới thiệu cách ghi thu chi")))
+        .isSameAs(failure);
   }
 
   @Test
@@ -212,13 +217,20 @@ class ChatServiceImplTests {
   }
 
   private ChatService service(StaticListableBeanFactory clients) {
+    var history = new ConversationHistory();
     return new ChatServiceImpl(
         clients.getBeanProvider(ChatClient.class),
-        JsonMapper.builder().build(),
         validators.getValidator(),
         transactions,
-        ZoneId.of("Asia/Ho_Chi_Minh"),
-        mock(DraftService.class));
+        mock(DraftService.class),
+        mock(TransactionQueryService.class),
+        new TransactionMessageFormatter(),
+        history,
+        new TransactionModelInterpreter(
+            JsonMapper.builder().build(),
+            validators.getValidator(),
+            ZoneId.of("Asia/Ho_Chi_Minh"),
+            history));
   }
 
   private static ChatModel modelReturning(String answer) {

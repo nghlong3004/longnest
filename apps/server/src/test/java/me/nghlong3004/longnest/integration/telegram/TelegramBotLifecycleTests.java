@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.telegram.telegrambots.longpolling.TelegramBotsLongPollingApplication;
 import org.telegram.telegrambots.meta.exceptions.TelegramApiException;
@@ -15,9 +16,11 @@ class TelegramBotLifecycleTests {
 
   private final TelegramBotsLongPollingApplication polling =
       mock(TelegramBotsLongPollingApplication.class);
-  private final TelegramProperties properties = new TelegramProperties("synthetic-token", 123L);
+  private final TelegramProperties properties =
+      new TelegramProperties("synthetic-token", Set.of(123L, 789L));
   private final TelegramMessageHandler handler = mock(TelegramMessageHandler.class);
-  private final TelegramBotLifecycle lifecycle = new TelegramBotLifecycle(polling, properties, handler);
+  private final TelegramBotLifecycle lifecycle =
+      new TelegramBotLifecycle(polling, properties, handler);
 
   @Test
   void registersOnceAndUnregistersOnceAcrossRepeatedLifecycleCalls() throws TelegramApiException {

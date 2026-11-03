@@ -65,7 +65,7 @@ longnest:
   telegram:
     enabled: ${LONGNEST_TELEGRAM_ENABLED:false}
     token: ${LONGNEST_TELEGRAM_TOKEN:}
-    user: ${LONGNEST_TELEGRAM_USER:}
+    users: ${LONGNEST_TELEGRAM_USERS:${LONGNEST_TELEGRAM_USER:}}
 
 logging:
   level:
