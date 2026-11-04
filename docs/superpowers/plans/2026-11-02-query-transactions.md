@@ -1,5 +1,44 @@
 # View income and expenses
 
+## Push and development reload — 2026-11-03
+
+Lead `32308066-bf43-4047-a491-39d26da36693` recovered the same accepted source/
+runtime ownership; completed Peer assignments remain closed. Current task authorizes
+normal push and development reload only, superseding historical no-push statements.
+No feature/deployment scope was added. Recovery found clean main/index/worktree,
+accepted HEAD `c57c5d22fd04431dd588f29c0afaf70ab030f217`, implementation `7478bf8`,
+and the previously owned Maven/app `304628`/`304856` in the existing named terminal.
+
+Fetched origin/main and confirmed it was an ancestor (remote/local ahead counts
+0/2). Normal `git push origin main:main` succeeded without force; subsequent
+`git ls-remote origin refs/heads/main` confirmed
+`c57c5d22fd04431dd588f29c0afaf70ab030f217` on
+`git@github.com:nghlong3004/longnest.git`, branch `main`. No authentication or
+divergence error. Both completed delivery commits are pushed.
+
+Lead gracefully stopped the owned bot with Ctrl-C in terminal
+`d06fad74-19b0-42c7-9018-022527da13db`; normal shutdown/BUILD SUCCESS observed,
+old app/Maven absent, no remaining LongnestApplication poller. The same
+`longnest-dev-postgres-1` stays running unchanged. Reload uses exactly
+`bash /home/nghlong3004/projects/longnest/scripts/dev-server.sh` with existing
+intended configuration, without dotenv edits, secret output, container recreation,
+unsolicited messages or real-user validation mutations.
+
+Reload READY: the fresh launch segment completed at
+`2026-11-03T14:13:21.336+07:00`, with PostgreSQL ready, DeepSeek structured chat
+enabled, Telegram bot started and Started LongnestApplication. No startup or
+polling error observed. Maven PID `327531` owns app PID `327856`; only one
+LongnestApplication process is present. Lead retains runtime ownership in the
+same named terminal; Ctrl-C stops backend while PostgreSQL stays running.
+Post-start accepted 99-file source/test manifest and source/classpath prompt
+match. This is startup/registration evidence, not a live user-chat/model probe.
+No tests were rerun or product code changed for this push/reload; existing
+337-test accepted evidence remains recorded below. No account-routing error
+prevented continuation. Local main and origin/main both remain at the pushed
+`c57c5d22fd04431dd588f29c0afaf70ab030f217`.
+This operational status update is intentionally local/uncommitted; no additional
+commit is needed to push the completed accepted delivery.
+
 ## Current completed delivery — final conventions and local commits
 
 Completed and accepted on 2026-11-03. Implementation commit:
