@@ -1,4 +1,4 @@
-package me.nghlong3004.longnest.service;
+package me.nghlong3004.longnest.presentation;
 
 /** Presentation only; identity and the channel DTO's control/bidi/length rules remain unchanged. */
 public final class DisplayNamePresentation {

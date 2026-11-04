@@ -2,6 +2,19 @@
 
 Java 25 / Spring Boot 4.1.1 / PostgreSQL / Flyway.
 
+## Java packages
+
+Under `me.nghlong3004.longnest`:
+
+- `service`: business service interfaces; `service.impl` contains their implementations.
+- `conversation`: conversation history, model interpretation and Vietnamese query recovery.
+- `presentation`: channel-independent plain-text formatting, action previews and display-name presentation.
+- `integration`: Telegram and DeepSeek configuration, clients and channel-specific behavior.
+  Telegram uses a shared sender adapter, callback command handlers/router, typed edit
+  sessions, a bounded UI registry and a separate keyboard renderer.
+- `configuration`, `mapper`, `model`, `repository`, `exception`: shared bean configuration,
+  object mapping, DTOs/entities/enums, persistence and error handling.
+
 ## Telegram chatbot
 
 Configure the repository-root `.env.dev` using the existing names:
@@ -125,8 +138,12 @@ Tracked query views reset to fresh first pages and totals after a mutation.
 Source-only edit-input receipts also prevent consumed field messages and edit
 `/cancel` messages from replaying into creation, even after restart.
 Edit sessions expire after 15 minutes and do not survive restart; old callbacks
-then require a new query. View tracking is process-local, so pre-restart cards
-cannot be refreshed automatically. User-facing text reports ledger success separately
+then require a new query. View tracking is process-local and bounded: at most 128 chats, 20 active query
+pages per chat for one hour, and 200 recent card references per chat for deletion.
+Expired, evicted or pre-restart pagination/actions require a fresh query; cards
+outside the retained references cannot be removed automatically. Evicting a chat
+also discards its edit session; new, previously unseen text then follows ordinary
+chat handling. Financial rows and durable replay receipts are unaffected. User-facing text reports ledger success separately
 from any actual failure to refresh/remove displayed messages, without platform caveats.
 
 The SDK uses long polling. Run one instance per bot token. Shutdown stops polling

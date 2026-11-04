@@ -3,8 +3,11 @@ package me.nghlong3004.longnest;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.AdditionalAnswers.delegatesTo;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -21,9 +24,11 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
+import me.nghlong3004.longnest.integration.telegram.TelegramMessageSender;
 import me.nghlong3004.longnest.integration.telegram.TelegramTransactionActions;
-import me.nghlong3004.longnest.integration.telegram.TelegramTransactionPresentation;
+import me.nghlong3004.longnest.integration.telegram.TelegramTransactionKeyboard;
 import me.nghlong3004.longnest.integration.telegram.TelegramTransactionQueryCodec;
+import me.nghlong3004.longnest.integration.telegram.TelegramTransactionRegistry;
 import me.nghlong3004.longnest.mapper.TransactionMapper;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
@@ -36,11 +41,13 @@ import me.nghlong3004.longnest.model.enums.ChatAction;
 import me.nghlong3004.longnest.model.enums.QueryPeriod;
 import me.nghlong3004.longnest.model.enums.TimeOfDay;
 import me.nghlong3004.longnest.model.enums.TransactionCategory;
+import me.nghlong3004.longnest.model.enums.TransactionField;
 import me.nghlong3004.longnest.model.enums.TransactionType;
+import me.nghlong3004.longnest.presentation.TransactionActionPresentation;
+import me.nghlong3004.longnest.presentation.TransactionMessageFormatter;
 import me.nghlong3004.longnest.repository.TransactionRepository;
 import me.nghlong3004.longnest.service.ChatService;
 import me.nghlong3004.longnest.service.DraftService;
-import me.nghlong3004.longnest.service.TransactionMessageFormatter;
 import me.nghlong3004.longnest.service.TransactionMutationService;
 import me.nghlong3004.longnest.service.TransactionQueryService;
 import me.nghlong3004.longnest.service.TransactionService;
@@ -102,32 +109,37 @@ class TelegramTransactionMutationTests {
     keyboards = new HashMap<>();
     sequence = 100;
     when(client.execute(any(SendMessage.class)))
-        .thenAnswer(call -> {
-          SendMessage request = call.getArgument(0);
-          sent.add(request);
-          sequence++;
-          keyboards.put(sequence, (InlineKeyboardMarkup) request.getReplyMarkup());
-          return message(sequence, owner);
-        });
+        .thenAnswer(
+            call -> {
+              SendMessage request = call.getArgument(0);
+              sent.add(request);
+              sequence++;
+              keyboards.put(sequence, (InlineKeyboardMarkup) request.getReplyMarkup());
+              return message(sequence, owner);
+            });
     when(client.execute(any(EditMessageText.class)))
-        .thenAnswer(call -> {
-          EditMessageText request = call.getArgument(0);
-          edited.add(request);
-          keyboards.put(request.getMessageId(), request.getReplyMarkup());
-          return null;
-        });
+        .thenAnswer(
+            call -> {
+              EditMessageText request = call.getArgument(0);
+              edited.add(request);
+              keyboards.put(request.getMessageId(), request.getReplyMarkup());
+              return null;
+            });
     clock = mock(Clock.class);
     when(clock.instant()).thenReturn(Instant.parse("2026-11-02T00:00:00Z"));
     actions =
         new TelegramTransactionActions(
-            client,
+            new TelegramMessageSender(client),
             mutations,
             queries,
             new TransactionMessageFormatter(),
             new TelegramTransactionQueryCodec(),
             clock,
             mapper,
-            new TelegramTransactionPresentation(new TransactionMessageFormatter()));
+            new TransactionActionPresentation(new TransactionMessageFormatter()),
+            new TelegramTransactionRegistry(clock),
+            new TelegramTransactionKeyboard(
+                new TransactionActionPresentation(new TransactionMessageFormatter())));
     owner = Math.abs(UUID.randomUUID().getMostSignificantBits() % 1000000000) + 1000;
     source =
         new ChatMessage(
@@ -254,10 +266,11 @@ class TelegramTransactionMutationTests {
         .doesNotContain("Telegram", "Thanos", "hiệu ứng", "nỗ lực riêng");
     for (int visible : List.of(card, duplicate)) {
       assertThat(edited.stream().filter(edit -> edit.getMessageId() == visible).toList())
-          .anySatisfy(edit -> {
-            assertThat(edit.getText()).contains("đã xóa");
-            assertThat(edit.getReplyMarkup().getKeyboard()).isEmpty();
-          });
+          .anySatisfy(
+              edit -> {
+                assertThat(edit.getText()).contains("đã xóa");
+                assertThat(edit.getReplyMarkup().getKeyboard()).isEmpty();
+              });
     }
     assertThat(sent.stream().map(SendMessage::getText))
         .anyMatch(value -> value.contains("Em chưa thấy khoản chi"));
@@ -280,7 +293,11 @@ class TelegramTransactionMutationTests {
     click(prompt, "Xóa");
     var old = callback(prompt, button(prompt, "Xóa vĩnh viễn"), owner);
     var revision = mutations.load(source, id);
-    mutations.save(source, id, revision.version(), mutations.preview(revision, "amount", "999"));
+    mutations.save(
+        source,
+        id,
+        revision.version(),
+        mutations.preview(revision, TransactionField.AMOUNT, "999"));
     actions.handleCallback(old, (Message) old.getMessage());
     assertThat(transactions.existsById(id)).isTrue();
     assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("999");
@@ -343,6 +360,7 @@ class TelegramTransactionMutationTests {
     var codec = new TelegramTransactionQueryCodec();
     var oldNext = codec.encode(first, 1);
     actions.sendPage(source.chatId(), 1, new ChatReply("first", null, first));
+    int oldNextAnchor = sequence;
     var second = queries.view(source, query, first.nextCursor());
     actions.sendPage(source.chatId(), 1, new ChatReply("second", null, second));
     click(card, "⋯");
@@ -355,14 +373,11 @@ class TelegramTransactionMutationTests {
     assertThat(sent.stream().map(SendMessage::getText))
         .anyMatch(value -> value.contains("6.000đ") && value.contains("6 khoản"));
     assertThat(edited.stream().filter(edit -> edit.getMessageId() == card).toList())
-        .anyMatch(edit ->
-            edit.getText().contains("không còn dùng được")
-                && edit.getReplyMarkup().getKeyboard().isEmpty());
-    // If the cursor still exists in the fresh first page its stateless token is safely reusable;
-    // otherwise the old pagination callback is rejected before a database read.
-    var fresh = queries.view(source, query, null);
-    if (!oldNext.equals(codec.encode(fresh, 1)))
-      assertThat(actions.isRevokedPage(source.chatId(), oldNext)).isTrue();
+        .anyMatch(
+            edit ->
+                edit.getText().contains("không còn dùng được")
+                    && edit.getReplyMarkup().getKeyboard().isEmpty());
+    assertThat(actions.isRevokedPage(source.chatId(), oldNext, oldNextAnchor)).isTrue();
   }
 
   @Test
@@ -445,17 +460,18 @@ class TelegramTransactionMutationTests {
             value.getMessageId().toString(),
             source.sentAt(),
             value.getText());
-    assertThatThrownBy(() ->
-            recording.record(
-                new TransactionData(
-                    TransactionType.EXPENSE,
-                    new BigDecimal("50000"),
-                    null,
-                    null,
-                    null,
-                    LocalDate.parse("2026-11-02"),
-                    null),
-                replay))
+    assertThatThrownBy(
+            () ->
+                recording.record(
+                    new TransactionData(
+                        TransactionType.EXPENSE,
+                        new BigDecimal("50000"),
+                        null,
+                        null,
+                        null,
+                        LocalDate.parse("2026-11-02"),
+                        null),
+                    replay))
         .isInstanceOf(RuntimeException.class);
     assertThat(chatService.reply(replay).text()).contains("thao tác");
     assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("45000");
@@ -580,11 +596,12 @@ class TelegramTransactionMutationTests {
     assertThat(complete)
         .contains(legacy, replacement, "Trước", "Sau", "Các trường khác giữ nguyên");
     assertThat(chunks)
-        .allSatisfy(chunk -> {
-          assertThat(chunk.length()).isLessThanOrEqualTo(4096);
-          assertThat(Character.isHighSurrogate(chunk.charAt(chunk.length() - 1))).isFalse();
-          assertThat(Character.isLowSurrogate(chunk.charAt(0))).isFalse();
-        });
+        .allSatisfy(
+            chunk -> {
+              assertThat(chunk.length()).isLessThanOrEqualTo(4096);
+              assertThat(Character.isHighSurrogate(chunk.charAt(chunk.length() - 1))).isFalse();
+              assertThat(Character.isLowSurrogate(chunk.charAt(0))).isFalse();
+            });
     int finalAnchor = prompt;
     if (legacy.length() > 4096) {
       var delivered = sent.subList(sendsBefore, sent.size());
@@ -679,17 +696,18 @@ class TelegramTransactionMutationTests {
     var calls = new AtomicInteger();
     var failed = new AtomicReference<SendMessage>();
     when(client.execute(any(SendMessage.class)))
-        .thenAnswer(call -> {
-          SendMessage request = call.getArgument(0);
-          if (calls.incrementAndGet() == 2) {
-            failed.set(request);
-            throw new TelegramApiException("synthetic final chunk failure");
-          }
-          sent.add(request);
-          sequence++;
-          keyboards.put(sequence, (InlineKeyboardMarkup) request.getReplyMarkup());
-          return message(sequence, owner);
-        });
+        .thenAnswer(
+            call -> {
+              SendMessage request = call.getArgument(0);
+              if (calls.incrementAndGet() == 2) {
+                failed.set(request);
+                throw new TelegramApiException("synthetic final chunk failure");
+              }
+              sent.add(request);
+              sequence++;
+              keyboards.put(sequence, (InlineKeyboardMarkup) request.getReplyMarkup());
+              return message(sequence, owner);
+            });
     actions.handleText(text("Replacement"));
     assertThat(calls.get()).isEqualTo(2);
     assertThat(
@@ -710,6 +728,99 @@ class TelegramTransactionMutationTests {
     assertThat(actions.handleText(text("/cancel"))).isTrue();
     assertThat(jdbc.queryForMap("select * from transactions where id = ?", id)).isEqualTo(before);
     assertThat(actions.handleText(text("ordinary"))).isFalse();
+  }
+
+  @ParameterizedTest
+  @CsvSource({"Sửa,false", "Xóa,false", "Số tiền,true"})
+  void failedMenuOrFieldDeliveryCanRetryTheStillVisibleButton(String label, boolean field)
+      throws Exception {
+    click(card, "⋯");
+    int prompt = sequence;
+    if (field) click(prompt, "Sửa");
+    var request = callback(prompt, button(prompt, label), owner);
+    var attempts = new AtomicInteger();
+    when(client.execute(any(EditMessageText.class)))
+        .thenAnswer(
+            call -> {
+              if (attempts.getAndIncrement() == 0)
+                throw new TelegramApiException("synthetic refusal");
+              EditMessageText update = call.getArgument(0);
+              edited.add(update);
+              keyboards.put(update.getMessageId(), update.getReplyMarkup());
+              return null;
+            });
+    actions.handleCallback(request, (Message) request.getMessage());
+    actions.handleCallback(request, (Message) request.getMessage());
+    assertThat(attempts.get()).isEqualTo(2);
+    assertThat(edited.getLast().getText())
+        .contains(field ? "số tiền dương" : label.equals("Xóa") ? "xóa vĩnh viễn" : "phần cần sửa");
+    assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("45000");
+  }
+
+  @Test
+  void invalidReplacementInputRetiresThePreviouslyDisplayedSave() {
+    click(card, "⋯");
+    int prompt = sequence;
+    click(prompt, "Sửa");
+    click(prompt, "Số tiền");
+    actions.handleText(text("50k"));
+    var obsoleteSave = callback(prompt, button(prompt, "Lưu"), owner);
+    actions.handleText(text("invalid replacement"));
+    actions.handleCallback(obsoleteSave, (Message) obsoleteSave.getMessage());
+    assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("45000");
+    assertThat(actions.handleText(text("60k"))).isTrue();
+    click(prompt, "Lưu");
+    assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("60000");
+  }
+
+  @Test
+  void receiptFailureWithFailedErrorDeliveryStillRetiresPreviousSave() throws Exception {
+    var guarded = mock(TransactionMutationService.class, delegatesTo(mutations));
+    var formatter = new TransactionMessageFormatter();
+    var presentation = new TransactionActionPresentation(formatter);
+    actions =
+        new TelegramTransactionActions(
+            new TelegramMessageSender(client),
+            guarded,
+            queries,
+            formatter,
+            new TelegramTransactionQueryCodec(),
+            clock,
+            mapper,
+            presentation,
+            new TelegramTransactionRegistry(clock),
+            new TelegramTransactionKeyboard(presentation));
+    actions.sendPage(source.chatId(), 1, new ChatReply("Summary", null, page));
+    card = sequence;
+    click(card, "⋯");
+    int prompt = sequence;
+    click(prompt, "Sửa");
+    click(prompt, "Số tiền");
+    actions.handleText(text("50k"));
+    var obsoleteSave = callback(prompt, button(prompt, "Lưu"), owner);
+    doThrow(new IllegalStateException("synthetic receipt failure"))
+        .when(guarded)
+        .consumeInput(any(ChatMessage.class));
+    when(client.execute(any(EditMessageText.class)))
+        .thenThrow(new TelegramApiException("synthetic delivery refusal"));
+    assertThat(actions.handleText(text("60k"))).isTrue();
+    actions.handleCallback(obsoleteSave, (Message) obsoleteSave.getMessage());
+    assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("45000");
+    doAnswer(call -> mutations.consumeInput(call.getArgument(0)))
+        .when(guarded)
+        .consumeInput(any(ChatMessage.class));
+    doAnswer(
+            call -> {
+              EditMessageText update = call.getArgument(0);
+              edited.add(update);
+              keyboards.put(update.getMessageId(), update.getReplyMarkup());
+              return null;
+            })
+        .when(client)
+        .execute(any(EditMessageText.class));
+    assertThat(actions.handleText(text("70k"))).isTrue();
+    click(prompt, "Lưu");
+    assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("70000");
   }
 
   List<String> previewChunks(int editsBefore, int sendsBefore) {

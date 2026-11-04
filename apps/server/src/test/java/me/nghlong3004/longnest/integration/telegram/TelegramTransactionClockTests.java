@@ -26,7 +26,8 @@ import me.nghlong3004.longnest.model.dto.TransactionRevision;
 import me.nghlong3004.longnest.model.dto.TransactionTotals;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.TransactionType;
-import me.nghlong3004.longnest.service.TransactionMessageFormatter;
+import me.nghlong3004.longnest.presentation.TransactionActionPresentation;
+import me.nghlong3004.longnest.presentation.TransactionMessageFormatter;
 import me.nghlong3004.longnest.service.TransactionMutationService;
 import me.nghlong3004.longnest.service.TransactionQueryService;
 import org.junit.jupiter.api.Test;
@@ -48,21 +49,24 @@ class TelegramTransactionClockTests {
     var instant = Instant.parse("2001-02-03T04:05:06Z");
     var actions =
         new TelegramTransactionActions(
-            client,
+            new TelegramMessageSender(client),
             mutations,
             mock(TransactionQueryService.class),
             formatter,
             new TelegramTransactionQueryCodec(),
             Clock.fixed(instant, ZoneOffset.UTC),
             mock(TransactionMapper.class),
-            new TelegramTransactionPresentation(formatter));
+            new TransactionActionPresentation(formatter),
+            new TelegramTransactionRegistry(Clock.fixed(instant, ZoneOffset.UTC)),
+            new TelegramTransactionKeyboard(new TransactionActionPresentation(formatter)));
     var sequence = new AtomicInteger(100);
     var requests = new ArrayList<SendMessage>();
     when(client.execute(any(SendMessage.class)))
-        .thenAnswer(call -> {
-          requests.add(call.getArgument(0));
-          return message(sequence.incrementAndGet());
-        });
+        .thenAnswer(
+            call -> {
+              requests.add(call.getArgument(0));
+              return message(sequence.incrementAndGet());
+            });
     var id = UUID.randomUUID();
     var date = LocalDate.of(2001, 2, 3);
     var item =

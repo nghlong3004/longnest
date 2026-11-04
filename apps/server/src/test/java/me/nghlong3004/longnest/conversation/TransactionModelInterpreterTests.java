@@ -1,4 +1,4 @@
-package me.nghlong3004.longnest.service;
+package me.nghlong3004.longnest.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -104,9 +104,10 @@ class TransactionModelInterpreterTests {
               ZoneId.of("Asia/Ho_Chi_Minh"),
               new ConversationHistory());
       var model = model("{\"action\":\"READY\",\"action\":\"CHAT\",\"reply\":\"Xin chào\"}");
-      assertThatThrownBy(() ->
-              interpreter.interpret(
-                  ChatClient.create(model), message("1", "Tin mới", Instant.EPOCH, null), null))
+      assertThatThrownBy(
+              () ->
+                  interpreter.interpret(
+                      ChatClient.create(model), message("1", "Tin mới", Instant.EPOCH, null), null))
           .isInstanceOfSatisfying(
               ResourceException.class,
               e -> assertThat(e.getErrorCode()).isEqualTo(ErrorCode.CHATBOT_INVALID_RESPONSE));

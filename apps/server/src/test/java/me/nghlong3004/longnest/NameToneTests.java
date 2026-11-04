@@ -16,10 +16,12 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.ScheduledFuture;
 import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
+import me.nghlong3004.longnest.integration.telegram.TelegramCallbackRouter;
 import me.nghlong3004.longnest.integration.telegram.TelegramMessageHandler;
+import me.nghlong3004.longnest.integration.telegram.TelegramMessageMapper;
+import me.nghlong3004.longnest.integration.telegram.TelegramMessageSender;
 import me.nghlong3004.longnest.integration.telegram.TelegramProperties;
 import me.nghlong3004.longnest.integration.telegram.TelegramTransactionActions;
-import me.nghlong3004.longnest.integration.telegram.TelegramTransactionQueryCodec;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.service.ChatService;
@@ -27,6 +29,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.ValueSource;
+import org.mapstruct.factory.Mappers;
 import org.mockito.ArgumentCaptor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.MessageType;
@@ -126,13 +129,14 @@ class NameToneTests {
         .scheduleWithFixedDelay(any(Runnable.class), any(Duration.class));
     var handler =
         new TelegramMessageHandler(
-            client,
+            new TelegramMessageSender(client),
             new TelegramProperties("synthetic", Set.of(sender)),
             chat,
             errors,
             scheduler,
-            new TelegramTransactionQueryCodec(),
-            mock(TelegramTransactionActions.class));
+            mock(TelegramTransactionActions.class),
+            new TelegramCallbackRouter(List.of()),
+            Mappers.getMapper(TelegramMessageMapper.class));
     var from = new User(sender, "<b>Long🙂</b>\u202e\n", false);
     from.setLastName("*Nguyễn*");
     var update = new Update();

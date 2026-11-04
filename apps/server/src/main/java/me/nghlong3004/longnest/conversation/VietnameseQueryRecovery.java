@@ -1,4 +1,4 @@
-package me.nghlong3004.longnest.service;
+package me.nghlong3004.longnest.conversation;
 
 import java.util.Locale;
 import java.util.regex.Pattern;

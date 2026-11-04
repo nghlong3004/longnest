@@ -126,19 +126,25 @@ khi hiển thị, không thay DB. Mỗi thẻ có nút **⋯** cho Sửa/Xóa. N
   bỏ nút. Đây là best effort: nếu Telegram từ chối cả sửa/gửi thì không thể cập
   nhật chữ trên client, nhưng token cũ đã bị vô hiệu hóa trên server. Lỗi Telegram
   không rollback DB và không báo sai thành lỗi tài chính.
-- Mọi query view đã gửi trong tiến trình hiện tại (kể cả thẻ trùng/lượt Xem thêm)
+- Các query view còn được theo dõi (kể cả thẻ trùng/lượt Xem thêm)
   được đánh dấu không còn hiện hành và bỏ nút, rồi gửi lại trang đầu/tổng mới theo
   đúng filter và tin yêu cầu gốc. Việc reset trang tránh sót/lặp do ngày hoặc loại
-  đổi làm khoản rời filter/thứ tự. Pagination token cũ không còn dùng được nếu
-  không trùng cursor hợp lệ của trang mới. Không sửa dữ liệu của người khác.
+  đổi làm khoản rời filter/thứ tự. Callback phân trang gắn cả token lẫn ID tin thẻ: nút của view cũ không dùng lại được
+  kể cả khi cursor trang mới trùng hệt. Không sửa dữ liệu của người khác.
 
 State giao diện nằm trong bộ nhớ của một bot instance; restart bỏ session/token
 sửa cũ (bấm lại nhận yêu cầu xem danh sách mới), không mất thay đổi đã commit hay
 receipt chống replay trong DB. Thẻ/query đã gửi trước restart không có registry để
 làm mới tự động. Tin mới chưa từng được nhận trước restart đi theo luồng chat
 thường, không tự khôi phục bước nhập sửa; cần mở query mới để tiếp tục sửa.
-Registry và chi phí refresh tăng theo lịch sử view trong vòng đời tiến trình;
-không có job nền hay retry bền vững cho Telegram. Nếu giao diện cập nhật thất bại, yêu cầu
+Registry giữ tối đa 128 chat theo LRU; mỗi chat có tối đa 20 trang query còn hiệu lực
+(trong một giờ) và 200 tham chiếu thẻ gần nhất để hỗ trợ gỡ thẻ trùng khi xóa.
+Refresh thu hồi các view cũ rồi đăng ký các trang mới, không duyệt lại lịch sử vô hạn.
+Nút phân trang/thao tác của view hết hạn hoặc bị thu hồi không còn dùng được; cần
+gửi yêu cầu xem mới. Xóa chỉ có thể tìm/gỡ những thẻ còn trong giới hạn theo dõi,
+nhưng quyền thao tác và dữ liệu đã commit luôn được kiểm tra trên server. Evict chat
+cũng bỏ phiên sửa trong bộ nhớ; tin mới chưa từng được xử lý sau eviction đi theo
+luồng chat thường. Không có job nền hay retry bền vững cho Telegram. Nếu giao diện cập nhật thất bại, yêu cầu
 xem lại danh sách để đọc DB hiện hành. Kiểm tra tự động dùng TelegramClient giả;
 chưa xác nhận UX trong Telegram thật. Copy nói rõ khi sổ đã đổi nhưng tin hiển thị
 chưa làm mới/gỡ được; không trộn lỗi hiển thị sau commit với lỗi thay đổi dữ liệu.
@@ -148,7 +154,8 @@ dần để phân trang keyset ổn định khi cùng ngày. UUID không thể h
 trong ngày. Tổng và danh sách mỗi lượt đọc trong cùng transaction REPEATABLE_READ;
 giữa hai lượt, giao dịch mới có thể làm đổi tổng. Callback `q:` mang type, ba ngày,
 UUID dạng Base64URL và ID tin yêu cầu; tối đa 64 byte, không chứa owner. Callback
-được kiểm tra lại người gửi/chat và phạm vi trước khi truy vấn. Không cần migration.
+được kiểm tra lại người gửi/chat, phạm vi, ID tin thẻ và việc trang vẫn còn trong registry trước khi
+truy vấn. Token cũ sau restart/eviction/hết hạn yêu cầu xem lại danh sách. Không cần migration.
 
 ## Hủy và xóa câu hỏi
 
@@ -259,3 +266,20 @@ có thể chứa toàn bộ dòng tài chính. Telegram polling gọi handler tr
 Kiểm tra tự động dùng credential giả, HTTP provider giả, TelegramClient giả và
 PostgreSQL Testcontainers; không gọi model/Telegram thật. Sau đó chạy launcher để
 chủ bot thử nhiều lượt, Reply và nút Hủy trực tiếp.
+
+## Tổ chức code Telegram
+
+`TelegramMessageHandler` xác thực update, chuyển text và định tuyến callback qua
+`TelegramCallbackRouter`. Các handler riêng xử lý xem thêm, hủy draft và sửa/xóa.
+`TelegramMessageSender` là adapter duy nhất gọi SDK để gửi/sửa/xóa/ack/typing,
+dùng chung cách chia text không cắt đôi surrogate pair. Keyboard cho sửa/xóa nằm ở
+`TelegramTransactionKeyboard`; text thuần nằm ở `presentation.TransactionActionPresentation`.
+
+`TelegramEditSession` kiểm soát các bước chuyển trạng thái và dữ liệu cần có của
+từng bước. `TelegramTransactionRegistry` quản lý token, phiên nhập, view và tham chiếu
+thẻ theo chat. Khóa stripe theo chat giữ thứ tự xử lý mà không giữ khóa toàn bộ
+coordinator khi gọi DB/Telegram. Không thêm xử lý nền hoặc thay đổi transaction của sổ.
+Menu/chọn trường chỉ đổi token khi cập nhật giao diện thành công. Giá trị nhập mới
+thu hồi nút Lưu trước đó, kể cả khi giá trị không hợp lệ; preview chỉ bật Lưu sau
+khi gửi đủ. `TransactionField` định kiểu các trường sửa, còn parsing/validation và
+quy tắc danh mục vẫn thuộc service mutation.

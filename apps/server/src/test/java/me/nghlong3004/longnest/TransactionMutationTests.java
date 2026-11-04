@@ -19,6 +19,7 @@ import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.QueryPeriod;
 import me.nghlong3004.longnest.model.enums.TimeOfDay;
 import me.nghlong3004.longnest.model.enums.TransactionCategory;
+import me.nghlong3004.longnest.model.enums.TransactionField;
 import me.nghlong3004.longnest.model.enums.TransactionType;
 import me.nghlong3004.longnest.repository.TransactionDraftRepository;
 import me.nghlong3004.longnest.repository.TransactionRepository;
@@ -80,7 +81,7 @@ class TransactionMutationTests {
   void editsOnlySelectedFieldPreservesProvenanceAndRejectsStaleSave() {
     var original = jdbc.queryForMap("select * from transactions where id = ?", id);
     var before = mutations.load(source, id);
-    var proposed = mutations.preview(before, "amount", "123.45");
+    var proposed = mutations.preview(before, TransactionField.AMOUNT, "123.45");
     assertThat(transactions.findById(id).orElseThrow().getAmount()).isEqualByComparingTo("45000");
     mutations.save(source, id, before.version(), proposed);
     var after = jdbc.queryForMap("select * from transactions where id = ?", id);
@@ -124,18 +125,19 @@ class TransactionMutationTests {
     var before = mutations.load(source, id);
     for (var invalid :
         java.util.List.of("0", "-1", "1e3", "NaN", "1,000", "1.001", "100000000000000000")) {
-      assertThatThrownBy(() -> mutations.preview(before, "amount", invalid))
+      assertThatThrownBy(() -> mutations.preview(before, TransactionField.AMOUNT, invalid))
           .isInstanceOf(IllegalArgumentException.class);
     }
     for (var invalid : java.util.List.of("2026-02-30", "0000-01-01", "tomorrow")) {
-      assertThatThrownBy(() -> mutations.preview(before, "date", invalid))
+      assertThatThrownBy(() -> mutations.preview(before, TransactionField.DATE, invalid))
           .isInstanceOf(IllegalArgumentException.class);
     }
-    assertThatThrownBy(() -> mutations.preview(before, "type", "DELETE"))
+    assertThatThrownBy(() -> mutations.preview(before, TransactionField.TYPE, "DELETE"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> mutations.preview(before, "userId", "hacked"))
+    assertThatThrownBy(() -> mutations.preview(before, null, "hacked"))
         .isInstanceOf(IllegalArgumentException.class);
-    assertThatThrownBy(() -> mutations.preview(before, "description", "x".repeat(501)))
+    assertThatThrownBy(
+            () -> mutations.preview(before, TransactionField.DESCRIPTION, "x".repeat(501)))
         .isInstanceOf(IllegalArgumentException.class);
     assertThat(mutations.load(source, id)).isEqualTo(before);
   }
@@ -148,14 +150,61 @@ class TransactionMutationTests {
         "l".repeat(1000),
         id);
     var before = mutations.load(source, id);
-    assertThatCode(() -> mutations.preview(before, "amount", "50k")).doesNotThrowAnyException();
-    var data = mutations.preview(before, "amount", "50k");
+    assertThatCode(() -> mutations.preview(before, TransactionField.AMOUNT, "50k"))
+        .doesNotThrowAnyException();
+    var data = mutations.preview(before, TransactionField.AMOUNT, "50k");
     assertThat(data.amount()).isEqualByComparingTo("50000");
     mutations.save(source, id, before.version(), data);
     var after = transactions.findById(id).orElseThrow();
     assertThat(after.getDescription()).hasSize(2000);
     assertThat(after.getLocation()).hasSize(1000);
     assertThat(after.getAmount()).isEqualByComparingTo("50000");
+  }
+
+  @Test
+  void typedNullableFieldsPreserveAllOtherValues() {
+    var before = mutations.load(source, id);
+    assertThat(mutations.preview(before, TransactionField.CATEGORY, "-"))
+        .isEqualTo(
+            new TransactionData(
+                TransactionType.EXPENSE,
+                new BigDecimal("45000.00"),
+                null,
+                "Lunch",
+                "Cafe",
+                LocalDate.of(2026, 11, 2),
+                TimeOfDay.NOON));
+    assertThat(mutations.preview(before, TransactionField.DESCRIPTION, "-"))
+        .isEqualTo(
+            new TransactionData(
+                TransactionType.EXPENSE,
+                new BigDecimal("45000.00"),
+                TransactionCategory.FOOD,
+                null,
+                "Cafe",
+                LocalDate.of(2026, 11, 2),
+                TimeOfDay.NOON));
+    assertThat(mutations.preview(before, TransactionField.LOCATION, "-"))
+        .isEqualTo(
+            new TransactionData(
+                TransactionType.EXPENSE,
+                new BigDecimal("45000.00"),
+                TransactionCategory.FOOD,
+                "Lunch",
+                null,
+                LocalDate.of(2026, 11, 2),
+                TimeOfDay.NOON));
+    assertThat(mutations.preview(before, TransactionField.TIME_OF_DAY, "EVENING"))
+        .isEqualTo(
+            new TransactionData(
+                TransactionType.EXPENSE,
+                new BigDecimal("45000.00"),
+                TransactionCategory.FOOD,
+                "Lunch",
+                "Cafe",
+                LocalDate.of(2026, 11, 2),
+                TimeOfDay.EVENING));
+    assertThat(mutations.load(source, id)).isEqualTo(before);
   }
 
   @Test
@@ -238,13 +287,17 @@ class TransactionMutationTests {
     assertThat(first.totals().count()).isEqualTo(7);
     assertThat(first.nextCursor()).isNotNull();
     var before = mutations.load(source, id);
-    mutations.save(source, id, before.version(), mutations.preview(before, "type", "INCOME"));
+    mutations.save(
+        source, id, before.version(), mutations.preview(before, TransactionField.TYPE, "INCOME"));
     assertThat(queries.view(source, query, null).totals().count()).isEqualTo(6);
     var other =
         first.items().stream().filter(item -> !item.id().equals(id)).findFirst().orElseThrow();
     before = mutations.load(source, other.id());
     mutations.save(
-        source, other.id(), before.version(), mutations.preview(before, "date", "2026-10-01"));
+        source,
+        other.id(),
+        before.version(),
+        mutations.preview(before, TransactionField.DATE, "2026-10-01"));
     var refreshed = queries.view(source, query, null);
     assertThat(refreshed.totals().amount()).isEqualByComparingTo("225000");
     assertThat(refreshed.items()).hasSize(5);

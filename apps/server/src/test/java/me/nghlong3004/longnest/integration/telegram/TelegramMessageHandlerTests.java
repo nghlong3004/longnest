@@ -4,7 +4,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
@@ -19,11 +21,14 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
+import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.stream.Collectors;
 import me.nghlong3004.longnest.exception.GlobalExceptionHandler;
 import me.nghlong3004.longnest.exception.ResourceException;
@@ -40,8 +45,9 @@ import me.nghlong3004.longnest.model.enums.Channel;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.model.enums.TransactionType;
+import me.nghlong3004.longnest.presentation.TransactionActionPresentation;
+import me.nghlong3004.longnest.presentation.TransactionMessageFormatter;
 import me.nghlong3004.longnest.service.ChatService;
-import me.nghlong3004.longnest.service.TransactionMessageFormatter;
 import me.nghlong3004.longnest.service.TransactionMutationService;
 import me.nghlong3004.longnest.service.TransactionQueryService;
 import org.junit.jupiter.api.BeforeEach;
@@ -73,23 +79,42 @@ class TelegramMessageHandlerTests {
   private final TaskScheduler typingScheduler = mock(TaskScheduler.class);
   private final ScheduledFuture<?> typingTask = mock(ScheduledFuture.class);
   private final ResourceBundleMessageSource messages = messageSource();
+  private final Clock clock = Clock.fixed(Instant.parse("2026-11-04T12:00:00Z"), ZoneOffset.UTC);
+  private final TelegramMessageSender sender = new TelegramMessageSender(client);
+  private final TelegramMessageMapper mapper = Mappers.getMapper(TelegramMessageMapper.class);
+  private final GlobalExceptionHandler exceptionHandler = new GlobalExceptionHandler(messages);
+  private final TelegramTransactionQueryCodec codec = new TelegramTransactionQueryCodec();
+  private final TransactionActionPresentation presentation =
+      new TransactionActionPresentation(new TransactionMessageFormatter());
+  private final TelegramTransactionRegistry registry = new TelegramTransactionRegistry(clock);
+  private final AtomicInteger sentMessageSequence = new AtomicInteger(600);
+  private final TelegramTransactionActions transactionActions =
+      new TelegramTransactionActions(
+          sender,
+          mock(TransactionMutationService.class),
+          mock(TransactionQueryService.class),
+          new TransactionMessageFormatter(),
+          codec,
+          clock,
+          Mappers.getMapper(TransactionMapper.class),
+          presentation,
+          registry,
+          new TelegramTransactionKeyboard(presentation));
   private final TelegramMessageHandler handler =
       new TelegramMessageHandler(
-          client,
+          sender,
           new TelegramProperties("synthetic-token", Set.of(123L, 789L)),
           chatService,
-          new GlobalExceptionHandler(messages),
+          exceptionHandler,
           typingScheduler,
-          new TelegramTransactionQueryCodec(),
-          new TelegramTransactionActions(
-              client,
-              mock(TransactionMutationService.class),
-              mock(TransactionQueryService.class),
-              new TransactionMessageFormatter(),
-              new TelegramTransactionQueryCodec(),
-              Clock.systemUTC(),
-              Mappers.getMapper(TransactionMapper.class),
-              new TelegramTransactionPresentation(new TransactionMessageFormatter())));
+          transactionActions,
+          new TelegramCallbackRouter(
+              List.of(
+                  new TelegramQueryCallbackHandler(
+                      sender, chatService, exceptionHandler, codec, transactionActions, clock),
+                  new TelegramDraftCallbackHandler(sender, chatService, exceptionHandler, mapper),
+                  transactionActions)),
+          mapper);
 
   @BeforeEach
   void stubChatbot() {
@@ -147,9 +172,10 @@ class TelegramMessageHandlerTests {
     update.getMessage().getFrom().setFirstName("<b>Long</b>\u202E\n");
     update.getMessage().getFrom().setLastName("*Nguyễn*");
     when(chatService.reply(any(ChatMessage.class)))
-        .thenAnswer(i ->
-            ChatReply.text(
-                "Chào " + i.<ChatMessage>getArgument(0).displayName() + ", em nghe đây."));
+        .thenAnswer(
+            i ->
+                ChatReply.text(
+                    "Chào " + i.<ChatMessage>getArgument(0).displayName() + ", em nghe đây."));
     handler.consume(List.of(update));
     var source = ArgumentCaptor.forClass(ChatMessage.class);
     verify(chatService).reply(source.capture());
@@ -198,14 +224,15 @@ class TelegramMessageHandlerTests {
   @Test
   void renewsTypingWhileProcessingAndCancelsItBeforeTheFinalReply() throws TelegramApiException {
     when(chatService.reply(chatMessage("slow reply")))
-        .thenAnswer(invocation -> {
-          verify(client).execute(any(SendChatAction.class));
-          var renewal = ArgumentCaptor.forClass(Runnable.class);
-          verify(typingScheduler)
-              .scheduleWithFixedDelay(renewal.capture(), eq(Duration.ofSeconds(4)));
-          renewal.getValue().run();
-          return ChatReply.text("Xong rồi anh.");
-        });
+        .thenAnswer(
+            invocation -> {
+              verify(client).execute(any(SendChatAction.class));
+              var renewal = ArgumentCaptor.forClass(Runnable.class);
+              verify(typingScheduler)
+                  .scheduleWithFixedDelay(renewal.capture(), eq(Duration.ofSeconds(4)));
+              renewal.getValue().run();
+              return ChatReply.text("Xong rồi anh.");
+            });
 
     handler.consume(List.of(update(123L, 123L, "private", "slow reply")));
 
@@ -215,6 +242,44 @@ class TelegramMessageHandlerTests {
     var sent = ArgumentCaptor.forClass(SendMessage.class);
     order.verify(client).execute(sent.capture());
     assertThat(sent.getValue().getText()).isEqualTo("Xong rồi anh.");
+  }
+
+  @Test
+  void rejectedTypingScheduleDoesNotAbortTheUpdateBatch() throws TelegramApiException {
+    doThrow(new RejectedExecutionException("private scheduler details"))
+        .when(typingScheduler)
+        .scheduleWithFixedDelay(any(Runnable.class), any(Duration.class));
+
+    assertThatCode(
+            () ->
+                handler.consume(
+                    List.of(
+                        update(123L, 123L, "private", "first"),
+                        update(123L, 123L, "private", "second"))))
+        .doesNotThrowAnyException();
+
+    var sent = ArgumentCaptor.forClass(SendMessage.class);
+    verify(client, times(2)).execute(sent.capture());
+    assertThat(sent.getAllValues())
+        .extracting(SendMessage::getText)
+        .containsExactly("Bot: first", "Bot: second");
+  }
+
+  @Test
+  void absentTypingTaskDoesNotAbortTheUpdateBatch() throws TelegramApiException {
+    doReturn(null)
+        .when(typingScheduler)
+        .scheduleWithFixedDelay(any(Runnable.class), any(Duration.class));
+
+    assertThatCode(
+            () ->
+                handler.consume(
+                    List.of(
+                        update(123L, 123L, "private", "first"),
+                        update(123L, 123L, "private", "second"))))
+        .doesNotThrowAnyException();
+
+    verify(client, times(2)).execute(any(SendMessage.class));
   }
 
   @Test
@@ -261,11 +326,12 @@ class TelegramMessageHandlerTests {
         .when(client)
         .execute(any(SendMessage.class));
 
-    assertThatCode(() ->
-            handler.consume(
-                List.of(
-                    update(123L, 123L, "private", "first"),
-                    update(123L, 123L, "private", "second"))))
+    assertThatCode(
+            () ->
+                handler.consume(
+                    List.of(
+                        update(123L, 123L, "private", "first"),
+                        update(123L, 123L, "private", "second"))))
         .doesNotThrowAnyException();
     var sent = ArgumentCaptor.forClass(SendMessage.class);
     verify(client, times(2)).execute(sent.capture());
@@ -325,13 +391,14 @@ class TelegramMessageHandlerTests {
     assertThat(sent.getAllValues().stream().map(SendMessage::getText).collect(Collectors.joining()))
         .isEqualTo(answer);
     assertThat(sent.getAllValues())
-        .allSatisfy(message -> {
-          assertThat(message.getText().length()).isLessThanOrEqualTo(4096);
-          assertThat(
-                  Character.isHighSurrogate(
-                      message.getText().charAt(message.getText().length() - 1)))
-              .isFalse();
-        });
+        .allSatisfy(
+            message -> {
+              assertThat(message.getText().length()).isLessThanOrEqualTo(4096);
+              assertThat(
+                      Character.isHighSurrogate(
+                          message.getText().charAt(message.getText().length() - 1)))
+                  .isFalse();
+            });
   }
 
   @Test
@@ -484,10 +551,11 @@ class TelegramMessageHandlerTests {
     verify(client, times(3)).execute(sent.capture());
     var messages = sent.getAllValues();
     assertThat(messages)
-        .allSatisfy(message -> {
-          assertThat(message.getReplyParameters().getMessageId()).isEqualTo(1);
-          assertThat(message.getParseMode()).isNull();
-        });
+        .allSatisfy(
+            message -> {
+              assertThat(message.getReplyParameters().getMessageId()).isEqualTo(1);
+              assertThat(message.getParseMode()).isNull();
+            });
     assertThat(messages.get(0).getText()).isEqualTo("Tổng chi: 3.000đ");
     assertThat(messages.get(1).getText()).contains("02/11/2026", "1.000đ", "Ăn sáng");
     assertThat(messages.get(0).getReplyMarkup()).isNull();
@@ -515,10 +583,13 @@ class TelegramMessageHandlerTests {
   void paginationUsesDatabaseWithoutModelAndKeepsOriginalQueryReplyTarget()
       throws TelegramApiException {
     var codec = new TelegramTransactionQueryCodec();
-    var token = codec.encode(samplePage(true), 42);
+    var page = samplePage(true);
+    var token = codec.encode(page, 42);
+    int pageAnchor = registerPage(page, 42);
     var request = codec.decode(token);
     var update = callback(123L, 123L, "private", UUID.randomUUID());
     update.getCallbackQuery().setData(token);
+    ((Message) update.getCallbackQuery().getMessage()).setMessageId(pageAnchor);
     when(chatService.nextPage(any(), eq(request)))
         .thenReturn(new ChatReply("Trang tiếp", null, samplePage(false)));
     handler.consume(List.of(update));
@@ -526,14 +597,16 @@ class TelegramMessageHandlerTests {
     verify(chatService).nextPage(source.capture(), eq(request));
     assertThat(source.getValue().externalUserId()).isEqualTo("123");
     assertThat(source.getValue().messageId()).isEqualTo("42");
+    assertThat(source.getValue().sentAt()).isEqualTo(Instant.parse("2026-11-04T12:00:00Z"));
     verify(chatService, never()).reply(any());
     verify(client).execute(any(AnswerCallbackQuery.class));
     var sent = ArgumentCaptor.forClass(SendMessage.class);
     verify(client, times(3)).execute(sent.capture());
     assertThat(sent.getAllValues())
-        .allSatisfy(message -> {
-          assertThat(message.getReplyParameters().getMessageId()).isEqualTo(42);
-        });
+        .allSatisfy(
+            message -> {
+              assertThat(message.getReplyParameters().getMessageId()).isEqualTo(42);
+            });
   }
 
   @Test
@@ -560,10 +633,11 @@ class TelegramMessageHandlerTests {
 
   @Test
   void paginationFailureRepliesSafelyToTheOriginalQuery() throws TelegramApiException {
+    var page = samplePage(true);
+    int pageAnchor = registerPage(page, 42);
     var update = callback(123L, 123L, "private", UUID.randomUUID());
-    update
-        .getCallbackQuery()
-        .setData(new TelegramTransactionQueryCodec().encode(samplePage(true), 42));
+    update.getCallbackQuery().setData(codec.encode(page, 42));
+    ((Message) update.getCallbackQuery().getMessage()).setMessageId(pageAnchor);
     when(chatService.nextPage(any(), any()))
         .thenThrow(new ResourceException(ErrorCode.QUERY_FAILED));
     handler.consume(List.of(update));
@@ -571,6 +645,57 @@ class TelegramMessageHandlerTests {
     verify(client).execute(sent.capture());
     assertThat(sent.getValue().getReplyParameters().getMessageId()).isEqualTo(42);
     assertThat(sent.getValue().getText()).contains("Em chưa lấy được danh sách");
+  }
+
+  @Test
+  void unknownPaginationRequestsAFreshListWithoutDatabaseAccess() throws TelegramApiException {
+    var update = callback(123L, 123L, "private", UUID.randomUUID());
+    update.getCallbackQuery().setData(codec.encode(samplePage(true), 42));
+
+    handler.consume(List.of(update));
+
+    var toast = ArgumentCaptor.forClass(AnswerCallbackQuery.class);
+    verify(client).execute(toast.capture());
+    assertThat(toast.getValue().getText()).contains("mở lại danh sách");
+    verifyNoInteractions(chatService);
+    verify(client, never()).execute(any(SendMessage.class));
+  }
+
+  @ParameterizedTest
+  @ValueSource(booleans = {false, true})
+  void retiredCardCannotReusePaginationEvenWhenFreshCardHasTheIdenticalCursorToken(boolean evicted)
+      throws TelegramApiException {
+    var page = samplePage(true);
+    var token = codec.encode(page, 42);
+    int oldAnchor = registerPage(page, 42);
+    int newAnchor;
+    if (evicted) {
+      for (int i = 0; i < 19; i++) registerPage(page, 42);
+      newAnchor = registerPage(page, 42);
+    } else {
+      registry.retireViews("123");
+      newAnchor = registerPage(page, 42);
+    }
+    var oldCallback = callback(123L, 123L, "private", UUID.randomUUID());
+    oldCallback.getCallbackQuery().setData(token);
+    ((Message) oldCallback.getCallbackQuery().getMessage()).setMessageId(oldAnchor);
+    handler.consume(List.of(oldCallback));
+    verifyNoInteractions(chatService);
+    when(chatService.nextPage(any(), any())).thenReturn(ChatReply.text("Trang mới"));
+    var newCallback = callback(123L, 123L, "private", UUID.randomUUID());
+    newCallback.getCallbackQuery().setData(token);
+    ((Message) newCallback.getCallbackQuery().getMessage()).setMessageId(newAnchor);
+    handler.consume(List.of(newCallback));
+    verify(chatService).nextPage(any(), eq(codec.decode(token)));
+  }
+
+  private int registerPage(TransactionPage page, int original) throws TelegramApiException {
+    when(client.execute(any(SendMessage.class)))
+        .thenAnswer(
+            i -> Message.builder().messageId(sentMessageSequence.incrementAndGet()).build());
+    transactionActions.sendPage("123", original, new ChatReply("Registered page", null, page));
+    clearInvocations(client);
+    return sentMessageSequence.get();
   }
 
   private static TransactionPage samplePage(boolean more) {

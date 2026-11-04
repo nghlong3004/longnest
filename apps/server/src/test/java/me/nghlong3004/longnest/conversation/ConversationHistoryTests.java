@@ -1,4 +1,4 @@
-package me.nghlong3004.longnest.service;
+package me.nghlong3004.longnest.conversation;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

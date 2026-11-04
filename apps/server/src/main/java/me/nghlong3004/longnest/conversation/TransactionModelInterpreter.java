@@ -1,4 +1,4 @@
-package me.nghlong3004.longnest.service;
+package me.nghlong3004.longnest.conversation;
 
 import jakarta.validation.Validator;
 import java.time.ZoneId;
@@ -13,6 +13,7 @@ import me.nghlong3004.longnest.model.enums.ChatAction;
 import me.nghlong3004.longnest.model.enums.DraftStatus;
 import me.nghlong3004.longnest.model.enums.ErrorCode;
 import me.nghlong3004.longnest.model.enums.TransactionType;
+import me.nghlong3004.longnest.presentation.DisplayNamePresentation;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;

@@ -2,7 +2,7 @@ package me.nghlong3004.longnest.configuration;
 
 import java.time.Clock;
 import java.time.ZoneId;
-import me.nghlong3004.longnest.service.ConversationHistory;
+import me.nghlong3004.longnest.conversation.ConversationHistory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

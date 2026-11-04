@@ -3,7 +3,6 @@ package me.nghlong3004.longnest.service.impl;
 import jakarta.validation.Validator;
 import java.math.BigDecimal;
 import java.time.LocalDate;
-import java.util.Set;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import me.nghlong3004.longnest.mapper.TransactionMapper;
@@ -13,6 +12,7 @@ import me.nghlong3004.longnest.model.dto.TransactionRevision;
 import me.nghlong3004.longnest.model.entity.Transaction;
 import me.nghlong3004.longnest.model.enums.TimeOfDay;
 import me.nghlong3004.longnest.model.enums.TransactionCategory;
+import me.nghlong3004.longnest.model.enums.TransactionField;
 import me.nghlong3004.longnest.model.enums.TransactionType;
 import me.nghlong3004.longnest.repository.DeletedTransactionSourceRepository;
 import me.nghlong3004.longnest.repository.TransactionActionInputRepository;
@@ -59,8 +59,8 @@ public class TransactionMutationServiceImpl implements TransactionMutationServic
   }
 
   @Override
-  public TransactionData preview(TransactionRevision before, String field, String input) {
-    if (input == null || input.isBlank() || input.length() > 500) {
+  public TransactionData preview(TransactionRevision before, TransactionField field, String input) {
+    if (field == null || input == null || input.isBlank() || input.length() > 500) {
       throw invalid();
     }
     var value = input.strip();
@@ -68,23 +68,19 @@ public class TransactionMutationServiceImpl implements TransactionMutationServic
     try {
       var data =
           new TransactionData(
-              field.equals("type") ? TransactionType.valueOf(value) : old.type(),
-              field.equals("amount") ? parseAmount(value) : old.amount(),
-              field.equals("category")
+              field == TransactionField.TYPE ? TransactionType.valueOf(value) : old.type(),
+              field == TransactionField.AMOUNT ? parseAmount(value) : old.amount(),
+              field == TransactionField.CATEGORY
                   ? (value.equals("-") ? null : TransactionCategory.valueOf(value))
                   : old.category(),
-              field.equals("description") ? nullable(value) : old.description(),
-              field.equals("location") ? nullable(value) : old.location(),
-              field.equals("date") ? LocalDate.parse(value) : old.date(),
-              field.equals("timeOfDay")
+              field == TransactionField.DESCRIPTION ? nullable(value) : old.description(),
+              field == TransactionField.LOCATION ? nullable(value) : old.location(),
+              field == TransactionField.DATE ? LocalDate.parse(value) : old.date(),
+              field == TransactionField.TIME_OF_DAY
                   ? (value.equals("-") ? null : TimeOfDay.valueOf(value))
                   : old.timeOfDay());
-      if (!Set.of("type", "amount", "category", "description", "location", "date", "timeOfDay")
-          .contains(field)) {
-        throw invalid();
-      }
       // Income has no expense category; this derived change is included in the full preview.
-      if (field.equals("type") && data.type() == TransactionType.INCOME) {
+      if (field == TransactionField.TYPE && data.type() == TransactionType.INCOME) {
         data =
             new TransactionData(
                 data.type(),

@@ -7,13 +7,13 @@ import jakarta.validation.Validation;
 import jakarta.validation.Validator;
 import java.time.Instant;
 import me.nghlong3004.longnest.configuration.LedgerConfiguration;
+import me.nghlong3004.longnest.conversation.ConversationHistory;
+import me.nghlong3004.longnest.conversation.TransactionModelInterpreter;
 import me.nghlong3004.longnest.model.dto.ChatMessage;
 import me.nghlong3004.longnest.model.dto.ChatReply;
 import me.nghlong3004.longnest.model.enums.Channel;
-import me.nghlong3004.longnest.service.ConversationHistory;
+import me.nghlong3004.longnest.presentation.TransactionMessageFormatter;
 import me.nghlong3004.longnest.service.DraftService;
-import me.nghlong3004.longnest.service.TransactionMessageFormatter;
-import me.nghlong3004.longnest.service.TransactionModelInterpreter;
 import me.nghlong3004.longnest.service.TransactionQueryService;
 import me.nghlong3004.longnest.service.TransactionService;
 import me.nghlong3004.longnest.service.impl.ChatServiceImpl;
@@ -36,19 +36,27 @@ class ConfiguredConversationHistoryTests {
           .withBean(DraftService.class, () -> mock(DraftService.class))
           .withBean(TransactionQueryService.class, () -> mock(TransactionQueryService.class))
           .withBean(TransactionMessageFormatter.class)
-          .run(context -> {
-            assertThat(context).hasSingleBean(ConversationHistory.class);
-            var first =
-                new ChatMessage(
-                    Channel.TELEGRAM, "123", "123", "1", Instant.EPOCH, "Nội dung trước");
-            context.getBean(ChatServiceImpl.class).rememberReply(first, ChatReply.text("Đã hiểu"));
-            var next =
-                new ChatMessage(
-                    Channel.TELEGRAM, "123", "123", "2", Instant.EPOCH.plusSeconds(1), "Tiếp theo");
-            assertThat(context.getBean(ConversationHistory.class).messages(next))
-                .extracting(Message::getText)
-                .containsExactly("Nội dung trước", "Đã hiểu");
-          });
+          .run(
+              context -> {
+                assertThat(context).hasSingleBean(ConversationHistory.class);
+                var first =
+                    new ChatMessage(
+                        Channel.TELEGRAM, "123", "123", "1", Instant.EPOCH, "Nội dung trước");
+                context
+                    .getBean(ChatServiceImpl.class)
+                    .rememberReply(first, ChatReply.text("Đã hiểu"));
+                var next =
+                    new ChatMessage(
+                        Channel.TELEGRAM,
+                        "123",
+                        "123",
+                        "2",
+                        Instant.EPOCH.plusSeconds(1),
+                        "Tiếp theo");
+                assertThat(context.getBean(ConversationHistory.class).messages(next))
+                    .extracting(Message::getText)
+                    .containsExactly("Nội dung trước", "Đã hiểu");
+              });
     }
   }
 }
